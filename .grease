@@ -1,0 +1,32 @@
+{
+	"theme": "grease",
+	"font-size": 10,
+	"font-face": "Monospaced",
+
+	"projects": {
+
+		"Grease": {
+			"name": "Grease",
+			"path": "."
+		}
+	},
+
+	"themes": {
+		"grease": {
+			"background-color": 		"0x243029",
+			"wxSTC_STYLE_DEFAULT": 		"0x243029",
+
+			"wxSTC_HPHP_DEFAULT": 		"0xFFFFFF",
+			"wxSTC_HPHP_HSTRING":		"0x0EC5E6",
+			"wxSTC_HPHP_SIMPLESTRING":	"0x0EC5E6",
+			"wxSTC_HPHP_WORD":		"0xDD00DD",
+			"wxSTC_HPHP_NUMBER":		"0xDD00DD",
+			"wxSTC_HPHP_VARIABLE":		"0x9999FF",
+			"wxSTC_HPHP_COMMENT":		"0xc0c0c0",
+			"wxSTC_HPHP_COMMENTLINE":	"0xc0c0c0",
+			"wxSTC_HPHP_HSTRING_VARIABLE":	"0xFF00FF",
+			"wxSTC_HPHP_OPERATOR":		"0xFF9999"
+		}
+	}
+
+}
