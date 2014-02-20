@@ -380,7 +380,7 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 		}
 		else
 		{
-			$this->buffers[$id]['textctrl'] = wxWebView::NewMethod($this->buffers[$id]['panel'], wxID_ANY, 'http://portal.irisadapt.com');
+			$this->buffers[$id]['textctrl'] = wxWebView::NewMethod($this->buffers[$id]['panel'], wxID_ANY, 'http://google.co.uk');
 			var_dump($this->buffers[$id]['textctrl']->RunScript("alert('Hello world!');"));
 
 			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_WEBVIEW_NEWWINDOW, [$this, 'onWebviewNavigating']);
