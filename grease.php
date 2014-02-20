@@ -503,7 +503,8 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 
 	public function onAddTab()
 	{
-		$this->addTab('New', FALSE, TRUE, TRUE);
+//		$this->addTab('New', FALSE, TRUE, TRUE); // adds a new webview instead of new editor tab
+		$this->addTab('New', FALSE, TRUE);
 	}
 
 	public function onQuit()
