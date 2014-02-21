@@ -1,4 +1,4 @@
-#!/usr/bin/php
+/#!/usr/bin/php
 <?php
 
 /*
@@ -225,13 +225,16 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
 
 		$IconNewTab = new wxBitmap();
-		$IconNewTab->LoadFile('ico'.PATH_SEPERATOR.'newtab.bmp', wxBITMAP_TYPE_BMP);
+		$IconNewTab->LoadFile('ico'.DIRECTORY_SEPARATOR.'newtab.ico', wxBITMAP_TYPE_ICO);
+
 		$iconFileOpen = new wxBitmap();
-		$iconFileOpen->LoadFile('ico'.PATH_SEPERATOR.'fileopen.bmp', wxBITMAP_TYPE_BMP);
+		$iconFileOpen->LoadFile('ico'.DIRECTORY_SEPARATOR.'fileopen.ico', wxBITMAP_TYPE_ICO);
+
 		$iconFileSave = new wxBitmap();
-		$iconFileSave->LoadFile('ico'.PATH_SEPERATOR.'filesave.bmp', wxBITMAP_TYPE_PNG);
+		$iconFileSave->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesave.ico', wxBITMAP_TYPE_ICO);
+
 		$iconFileSaveAs = new wxBitmap();
-		$iconFileSaveAs->LoadFile('ico'.PATH_SEPERATOR.'filesaveas.bmp', wxBITMAP_TYPE_BMP);
+		$iconFileSaveAs->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesaveas.ico', wxBITMAP_TYPE_ICO);
 
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
 		$toolbar->AddTool( 4, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
