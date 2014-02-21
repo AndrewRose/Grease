@@ -234,7 +234,8 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$iconFileSaveAs->LoadFile('ico/filesaveas.bmp', wxBITMAP_TYPE_BMP);
 
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
-		$toolbar->AddTool( wxID_ANY, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
+		$toolbar->AddTool( 4, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
+		$this->Connect(4, wxEVT_COMMAND_MENU_SELECTED, [$this,"onOpenFile"]);
 
 		$toolbar->AddTool(5, "Save File", $iconFileSave, "Save File", wxITEM_NORMAL);
 		$this->Connect(5, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTab"]);
@@ -261,10 +262,10 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 
 		foreach($this->settings['projects'] as $name => $details)
 		{
-			$this->treeAddRoot($details['name'], $details['path']);
+			$this->treeAddRoot($details['name'], $details['path'], $name);
 		}
 
-		$this->tree->Connect( wxEVT_LEFT_DCLICK, [$this, "onTreeClick"]);
+		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
 		$leftSizer->Add($this->tree, 1, wxALL|wxEXPAND, 5);
 		$leftPanel->SetSizer($leftSizer);
 		$leftPanel->Layout();
@@ -276,6 +277,7 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
 		//$this->notebook->Connect(wxID_ANY, wxVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
 		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
+//		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']);
 
 		$rightSizer->Add($this->notebook, 1, wxALL|wxEXPAND, 5);
 		$rightPanel->SetSizer($rightSizer);
@@ -301,10 +303,15 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 // fire call backs for tab..
 	}
 
-	public function treeAddRoot($name, $dir)
+	public function treeAddRoot($name, $dir, $project=FALSE)
 	{
 		$node = $this->tree->AppendItem($this->treeRoot, $name);
+		/* set project name to root node */
+		$nodeData = new wxTreeItemData();
+		$nodeData->project = $project;
+		$this->tree->SetItemData($node, $nodeData);
 		$this->scanDirectory($dir, $node, $this->tree);
+
 	}
 
 	public function addTab($title='New', $file=FALSE, $focus=FALSE, $webview=FALSE)
@@ -316,6 +323,10 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 		if($file)
 		{
 			$this->buffers[$id]['fileMd5'] = md5(file_get_contents($file));
+		}
+		else
+		{
+			$this->buffers[$id]['fileMd5'] = FALSE;
 		}
 
 		$this->buffers[$id]['breakpoints'] = [];
@@ -363,6 +374,8 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 			{
 				//$this->buffers[$id]['textctrl']->SetText(file_get_contents($file));
 				$this->buffers[$id]['textctrl']->LoadFile($file);
+//$this->settings['projects']['Grease']['state']['files'][$file] = TRUE;
+//file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
 			}
 
 			$this->buffers[$id]['panel']->SetId($id);
@@ -373,7 +386,7 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 			$this->buffers[$id]['textctrl']->SetSelection(0, 0);
 
 			// setup the debugging margin
-			$this->buffers[$id]['textctrl']->MarkerDefine(1, wxSTC_MARK_CIRCLE);
+			$this->buffers[$id]['textctrl']->MarkerDefine(1, wxSTC_MARK_CIRCLE, wxRED);
 			$this->buffers[$id]['textctrl']->SetMarginSensitive(1, TRUE);
 			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_MARGINCLICK, [$this, 'onMarginClick']);
 
@@ -473,22 +486,60 @@ echo $ev->GetURL()."\n";
 
 	public function getTabSelected()
 	{
-		return $this->notebook->GetPage($this->notebook->GetSelection())->GetId();
+		$selection = $this->notebook->GetSelection();
+
+		if($selection != -1)
+		{
+			$page = $this->notebook->GetPage($selection);
+			return $page->GetId();
+		}
+		return FALSE;
+	}
+
+	public function onOpenFile()
+	{
+		$openDialog = new wxFileDialog($this, 'Open file', wxEmptyString, wxEmptyString, wxFileSelectorDefaultWildcardStr);
+		if($openDialog->ShowModal() != wxID_CANCEL)
+		{
+			$filepath = $openDialog->GetPath();
+			$filename = $openDialog->GetFilename();
+			if(file_exists($filename))
+			{
+				$this->addTab($filename, $filepath, TRUE);
+			}
+		}
 	}
 
 	public function onSaveTab()
 	{
 		$id = $this->getTabSelected();
-		$this->buffers[$id]['textctrl']->SaveFile();
-		$this->buffers[$id]['fileMd5'] = md5(file_get_contents($this->buffers[$id]['file']));
+		if($id)
+		{
+			$this->buffers[$id]['textctrl']->SaveFile($this->buffers[$id]['file']);
+			$this->buffers[$id]['fileMd5'] = md5(file_get_contents($this->buffers[$id]['file']));
+			$this->notebook->SetPageText($this->notebook->GetSelection(), $this->buffers[$id]['title']); // remove * from title
+		}
 	}
 
 	public function onSaveTabAs()
 	{
-		$saveAsDialog = new wxFileDialog($this);
+		$id = $this->getTabSelected();
+		if(!$id)
+		{
+			return FALSE;
+		}
+
+		$saveAsDialog = new wxFileDialog($this, 'Save file as', wxEmptyString, wxEmptyString, wxFileSelectorDefaultWildcardStr, wxFD_SAVE);
 		if($saveAsDialog->ShowModal() != wxID_CANCEL)
 		{
 echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
+			$filename = $saveAsDialog->GetPath();
+			if(!file_exists($filename))
+			{
+				$this->buffers[$id]['textctrl']->SaveFile($filename);
+				$this->buffers[$id]['file'] = $filename;
+				$this->buffers[$id]['fileMd5'] = md5(file_get_contents($this->buffers[$id]['file']));
+			}
 			// save to file
 			// update current tab with new file
 		}
@@ -498,7 +549,21 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 	public function onTreeClick($ev)
 	{
 		$data = $this->tree->GetItemData($this->tree->GetSelection());
-		$this->addTab($data->name, $data->filename, TRUE);
+print_r($data);
+		if(isset($data->project))
+		{
+			$this->activeProject = $data->project;
+echo 'project: '.$data->project."\n";
+		}
+		else if(isset($data->filename))
+		{
+			if(is_file($data->filename))
+			{
+echo "file: ".$data->filename."\n";
+				$this->addTab($data->name, $data->filename, TRUE);
+			}
+		}
+		$ev->Skip();
 	}
 
 	public function onAddTab()
