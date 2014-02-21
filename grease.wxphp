@@ -131,7 +131,12 @@ echo 'here';
 
 	public function onSearchWindowInput($ev)
 	{
-		$id = $this->getTabSelected();
+		$activeTabId = $this->getTabSelected();
+
+		if($ev->GetKeyCode() == 343) // F4 replace
+		{
+			$this->buffers[$activeTabId]['textctrl']->ReplaceSelection('TEST');
+		}
 
 		if($ev->GetKeyCode() == 27)
 		{
@@ -140,8 +145,6 @@ echo 'here';
 				$this->searchWindow->Hide();
 			}
 		}
-
-		$activeTabId = $this->getTabSelected();
 
 		$searchString = $this->searchTextCtrl->GetValue();
 		if(!$searchString)
@@ -153,12 +156,12 @@ echo 'here';
 
 		if(in_array($ev->GetKeyCode(), [13, 342])) // enter or f3
 		{
-			$this->buffers[$id]['currentSearchPos'] += strlen($searchString);
+			$this->buffers[$activeTabId]['currentSearchPos'] += strlen($searchString);
 		}
 
-		$this->buffers[$id]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->buffers[$id]['currentSearchPos']);
-		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->buffers[$id]['currentSearchPos']);
-		$this->buffers[$activeTabId]['textctrl']->SetSelection($this->buffers[$id]['currentSearchPos'], $this->buffers[$id]['currentSearchPos']+$searchStringLength);
+		$this->buffers[$activeTabId]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->buffers[$activeTabId]['currentSearchPos']);
+		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->buffers[$activeTabId]['currentSearchPos']);
+		$this->buffers[$activeTabId]['textctrl']->SetSelection($this->buffers[$activeTabId]['currentSearchPos'], $this->buffers[$activeTabId]['currentSearchPos']+$searchStringLength);
 	}
 
 	public function onSearchWindowClose($ev)
@@ -220,7 +223,7 @@ echo 'here';
 		//echo json_encode($this->settings, JSON_PRETTY_PRINT);
 
 		//parent::__construct(null , wxID_ANY, , wxDefaultPosition, wxDefaultSize);
-		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 600,480 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1024,768 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 
 		if(file_exists('.grease'))
 		{
@@ -233,7 +236,7 @@ echo 'here';
 		print_r($this->theme);
 
 		$this->SetSizeHints( wxDefaultSize, wxDefaultSize );
-		$this->initMenu($this);
+//		$this->initMenu($this);
 
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -251,7 +254,11 @@ echo 'here';
 		$iconFileSaveAs = new wxBitmap();
 		$iconFileSaveAs->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesaveas.ico', wxBITMAP_TYPE_ICO);
 
+		$iconAbout = new wxBitmap();
+		$iconAbout->LoadFile('ico'.DIRECTORY_SEPARATOR.'about.ico', wxBITMAP_TYPE_ICO);
+
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
+		$this->Connect(1, wxEVT_COMMAND_MENU_SELECTED, [$this, "onAddTab"]);
 
 		$toolbar->AddTool( 7, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
 		$this->Connect(7, wxEVT_COMMAND_MENU_SELECTED, [$this,"onOpenFile"]);
@@ -262,6 +269,9 @@ echo 'here';
 		$toolbar->AddTool( 6, "Save File As", $iconFileSaveAs, "Save File As", wxITEM_NORMAL);
 		$this->Connect(6, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTabAs"]);
 
+		$toolbar->AddTool( 9, "About", $iconAbout, "About", wxITEM_NORMAL);
+		$this->Connect(9, wxEVT_COMMAND_MENU_SELECTED, [$this,"onAbout"]);
+
 		//$toolbar->AddSeparator();
 		$toolbar->Realize();
 
@@ -270,10 +280,11 @@ echo 'here';
 		/* priamry splitter */
 		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
 
-
 		/* left panel */
-		$leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize( 200,-1 ));
-		$leftSizer = new wxBoxSizer(wxVERTICAL );
+$leftPanelMaxSize = $this->GetSize()->GetWidth()/100*20;
+		$leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
+//$leftPanel->SetMinSize(new wxSize($leftPanelMaxSize, -1));
+		$leftSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->tree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
 
@@ -290,7 +301,9 @@ echo 'here';
 		$leftPanel->Layout();
 
 		/* right panel */
-		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY);
+$rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
+		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
+//$rightPanel->SetMinSize(new wxSize($rightPanelMaxSize, -1));
 		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
@@ -311,7 +324,9 @@ echo 'here';
 		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
 
 		$this->SetSizer($sizer);
+
 		$this->Layout();
+
 
 		//$this->ShowFullScreen(true, wxFULLSCREEN_ALL);
 		$this->Centre( wxBOTH );
@@ -319,13 +334,13 @@ echo 'here';
 
 	public function onTabClose($ev)
 	{
-                $selection = $this->notebook->GetSelection();
-
-                if($selection != -1)
-                {
-                        $page = $this->notebook->GetPage($ev->GetSelection());
-			unset($this->buffers[$page->GetId()]);
-                }
+		$page = $this->notebook->GetPage($ev->GetSelection());
+		$id = $page->GetId();
+		if($this->buffers[$id]['modified'])
+		{
+echo 'Tab is being closed but has modifications!'."\n";
+		}
+		unset($this->buffers[$id]);
 	}
 
 	public function onTabChange($ev)
@@ -374,6 +389,7 @@ echo "found!: ".$id."\n";
 
 		$this->buffers[$id]['breakpoints'] = [];
 		$this->buffers[$id]['currentSearchPos'] = 0;
+		$this->buffers[$id]['modified'] = FALSE;
 
 		$this->buffers[$id]['panel'] = new wxPanel($this->notebook);
 		$this->buffers[$id]['sizer'] = new wxBoxSizer(wxVERTICAL);
@@ -521,10 +537,12 @@ echo $ev->GetURL()."\n";
 
 		if($this->buffers[$id]['file'] && ( $diskMd5 != $bufferMd5))
 		{
+			$this->buffers[$id]['modified'] = TRUE;
 			$this->notebook->SetPageText($this->notebook->GetSelection(), $this->buffers[$id]['title'].'*');
 		}
 		else if($diskMd5 == $bufferMd5)
 		{
+			$this->buffers[$id]['modified'] = FALSE;
 			$this->notebook->SetPageText($this->notebook->GetSelection(), $this->buffers[$id]['title']);
 		}
 	}
@@ -611,6 +629,8 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 				$this->addTab($data->name, $data->filename, TRUE);
 			}
 		}
+
+		$this->tree->Unselect();
 		$ev->Skip();
 	}
 
@@ -639,7 +659,7 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 
 	public function onAbout()
 	{
-		wxMessageBox("Welcome to Grease\nFree for non-commerical use.", 'About');
+		wxMessageBox("Welcome to Grease\nCopyright(c) 2014 Andrew Rose (http://andrewrose.co.uk)\n\nFree for non-commerical use.", 'About');
 	}
 }
 
