@@ -29,6 +29,7 @@ class Grease extends wxFrame
 	public $notebook;
 	public $buffers = [];
 	public $currentSearchPos = FALSE;
+	public $searchTextCtrl = FALSE;
 
 	public $settings =
 	[
@@ -114,13 +115,34 @@ class Grease extends wxFrame
 echo "search!\n";
 	}
 
+	public function onSearchWindowKeyDown($ev)
+	{
+echo 'here';
+		$keyCode = $ev->GetKeyCode();
+
+// TODO need to catch escape key whilst focus is in the searchCtrl textCtrl..
+		if($keyCode == 27)
+		{
+			if($this->searchWindow)
+			{
+				$this->searchWindow->Hide();
+			}
+		}
+	}
+
 	public function onSearchWindowInput($ev)
 	{
-echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n";
+		if($ev->GetKeyCode() == 27)
+		{
+			if($this->searchWindow)
+			{
+				$this->searchWindow->Hide();
+			}
+		}
 
 		$activeTabId = $this->getTabSelected();
 
-		$searchString = $ev->GetString();
+		$searchString = $this->searchTextCtrl->GetValue();
 		if(!$searchString)
 		{
 			return;
@@ -128,7 +150,7 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 
 		$searchStringLength = strlen($searchString);
 
-		if($ev->GetEventType() == wxEVT_TEXT_ENTER)
+		if(in_array($ev->GetKeyCode(), [13, 342])) // enter or f3
 		{
 			$this->currentSearchPos += strlen($searchString);
 		}
@@ -182,19 +204,14 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$this->searchWindow = new wxPanel($this, wxID_ANY, $this->buffers[$id]['panel']->GetPosition(), new wxSize(220, 35));
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
-		$search = new wxSearchCtrl($this->searchWindow, 55, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-		$search->ShowSearchButton(TRUE);
-		$search->ShowCancelButton(TRUE);
-		$search->Connect(55, wxEVT_COMMAND_SEARCHCTRL_SEARCH_BTN, [$this, 'onSearchWindowSearch']);
-		$search->Connect(55, wxEVT_COMMAND_SEARCHCTRL_CANCEL_BTN, [$this, 'onSearchWindowClose']);
-		$sizer->add($search, 1, wxALL|wxEXPAND, 5);
+		$this->searchTextCtrl = new wxTextCtrl($this->searchWindow, 55, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+		$sizer->add($this->searchTextCtrl, 1, wxALL|wxEXPAND, 5);
 
 		$this->searchWindow->SetSizer($sizer);
 		$this->searchWindow->Layout();
 
-		$search->Connect(55, wxEVT_TEXT, [$this, 'onSearchWindowInput']);
-		$search->Connect(55, wxEVT_TEXT_ENTER, [$this, 'onSearchWindowInput']);
-		$search->SetFocus();
+		$this->searchTextCtrl->Connect(55, wxEVT_KEY_UP, [$this, 'onSearchWindowInput']);
+		$this->searchTextCtrl->SetFocus();
 	}
 
 	public function __construct( $parent=null )
@@ -475,7 +492,7 @@ echo $ev->GetURL()."\n";
 		$menu->Append($fileMenu,"&File");
 
 		$menuAbout = new wxMenu();
-		$menuAbout->AppendCheckItem(4,"&About...","Show about dialog");
+		$menuAbout->Append(4,"&About...","Show about dialog");
 		$menu->Append($menuAbout,"&Help");
 
 		$panel->SetMenuBar($menu);
