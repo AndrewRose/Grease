@@ -28,7 +28,6 @@ class Grease extends wxFrame
 	public $treeRoot;
 	public $notebook;
 	public $buffers = [];
-	public $keyboardState = FALSE;
 	public $currentSearchPos = FALSE;
 
 	public $settings =
@@ -150,8 +149,7 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 	public function onKeyDown($ev)
 	{
 		$keyCode = $ev->GetKeyCode();
-//echo 'raw :'.$this->keyboardState->GetRawKeyFlags()."\n";
-//echo $ev->GetKeyFlags()."\n";
+
 // TODO need to catch escape key whilst focus is in the searchCtrl textCtrl..
 		if($keyCode == 27)
 		{
@@ -161,8 +159,7 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 			}
 		}
 
-// BUG - Control always seems to be down ..
-		if($this->keyboardState->CmdDown() && $keyCode == 70)
+		if($ev->ControlDown() && $keyCode == 70)
 		{
 			if($this->searchWindow)
 			{
@@ -237,11 +234,12 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$iconFileSaveAs->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesaveas.ico', wxBITMAP_TYPE_ICO);
 
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
-		$toolbar->AddTool( 4, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
-		$this->Connect(4, wxEVT_COMMAND_MENU_SELECTED, [$this,"onOpenFile"]);
 
-		$toolbar->AddTool(5, "Save File", $iconFileSave, "Save File", wxITEM_NORMAL);
-		$this->Connect(5, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTab"]);
+		$toolbar->AddTool( 7, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
+		$this->Connect(7, wxEVT_COMMAND_MENU_SELECTED, [$this,"onOpenFile"]);
+
+		$toolbar->AddTool(8, "Save File", $iconFileSave, "Save File", wxITEM_NORMAL);
+		$this->Connect(8, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTab"]);
 
 		$toolbar->AddTool( 6, "Save File As", $iconFileSaveAs, "Save File As", wxITEM_NORMAL);
 		$this->Connect(6, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTabAs"]);
@@ -275,12 +273,15 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 
 		/* right panel */
 		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY);
-		$rightSizer = new wxBoxSizer(wxVERTICAL );
+		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
-		//$this->notebook->Connect(wxID_ANY, wxVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
+		//$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
+		//$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']); // ...
+
+		//$this->notebook = new wxNotebook($rightPanel, wxID_ANY);
 		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
-//		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']);
+
 
 		$rightSizer->Add($this->notebook, 1, wxALL|wxEXPAND, 5);
 		$rightPanel->SetSizer($rightSizer);
@@ -296,8 +297,11 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 
 		//$this->ShowFullScreen(true, wxFULLSCREEN_ALL);
 		$this->Centre( wxBOTH );
+	}
 
-		$this->keyboardState = new wxKeyboardState(TRUE);
+	public function onTabClose($id)
+	{
+var_dump($id);
 	}
 
 	public function onTabChange($ev)
@@ -321,16 +325,27 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 	{
 		static $id=1;
 
-		$this->buffers[$id]['title'] = $title;
-		$this->buffers[$id]['file'] = $file;
 		if($file)
 		{
+			foreach($this->buffers as $idx => $buffer)
+			{
+echo $idx.' '.$buffer['file']."\n";
+				if($buffer['file'] == $file)
+				{
+echo "found!: ".$id."\n";
+					$this->notebook->SetSelection($buffer['position']);
+					return TRUE;
+				}
+			}
 			$this->buffers[$id]['fileMd5'] = md5(file_get_contents($file));
 		}
 		else
 		{
 			$this->buffers[$id]['fileMd5'] = FALSE;
 		}
+
+		$this->buffers[$id]['title'] = $title;
+		$this->buffers[$id]['file'] = $file;
 
 		$this->buffers[$id]['breakpoints'] = [];
 
@@ -406,6 +421,7 @@ echo "tab: ".$ev->GetSelection()." selected.\n";
 		$this->buffers[$id]['sizer']->Add($this->buffers[$id]['textctrl'], 1, wxALL|wxEXPAND, 5);
 		$this->buffers[$id]['panel']->SetSizer($this->buffers[$id]['sizer']);
 		$this->notebook->AddPage($this->buffers[$id]['panel'], $title, $focus);
+		$this->buffers[$id]['position'] = $this->notebook->GetSelection();
 
 		$id++;
 	}
@@ -536,12 +552,15 @@ echo $ev->GetURL()."\n";
 		if($saveAsDialog->ShowModal() != wxID_CANCEL)
 		{
 echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
-			$filename = $saveAsDialog->GetPath();
-			if(!file_exists($filename))
+			$file = $saveAsDialog->GetPath();
+			$filename = $saveAsDialog->GetFileName();
+			if(!file_exists($file))
 			{
-				$this->buffers[$id]['textctrl']->SaveFile($filename);
-				$this->buffers[$id]['file'] = $filename;
+				$this->buffers[$id]['textctrl']->SaveFile($file);
+				$this->buffers[$id]['file'] = $file;
+				$this->buffers[$id]['title'] = $filename;
 				$this->buffers[$id]['fileMd5'] = md5(file_get_contents($this->buffers[$id]['file']));
+				$this->notebook->SetPageText($this->notebook->GetSelection(), $filename);
 			}
 			// save to file
 			// update current tab with new file
