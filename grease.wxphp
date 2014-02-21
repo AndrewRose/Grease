@@ -225,13 +225,13 @@ echo 'onSearchWindowInput: '.$ev->GetString()." - ".$this->currentSearchPos."\n"
 		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
 
 		$IconNewTab = new wxBitmap();
-		$IconNewTab->LoadFile('ico/newtab.bmp', wxBITMAP_TYPE_BMP);
+		$IconNewTab->LoadFile('ico'.PATH_SEPERATOR.'newtab.bmp', wxBITMAP_TYPE_BMP);
 		$iconFileOpen = new wxBitmap();
-		$iconFileOpen->LoadFile('ico/fileopen.bmp', wxBITMAP_TYPE_BMP);
+		$iconFileOpen->LoadFile('ico'.PATH_SEPERATOR.'fileopen.bmp', wxBITMAP_TYPE_BMP);
 		$iconFileSave = new wxBitmap();
-		$iconFileSave->LoadFile('ico/filesave.bmp', wxBITMAP_TYPE_BMP);
+		$iconFileSave->LoadFile('ico'.PATH_SEPERATOR.'filesave.bmp', wxBITMAP_TYPE_PNG);
 		$iconFileSaveAs = new wxBitmap();
-		$iconFileSaveAs->LoadFile('ico/filesaveas.bmp', wxBITMAP_TYPE_BMP);
+		$iconFileSaveAs->LoadFile('ico'.PATH_SEPERATOR.'filesaveas.bmp', wxBITMAP_TYPE_BMP);
 
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
 		$toolbar->AddTool( 4, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
