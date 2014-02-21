@@ -1,4 +1,4 @@
-/#!/usr/bin/php
+#!/usr/bin/php
 <?php
 
 /*
@@ -28,7 +28,6 @@ class Grease extends wxFrame
 	public $treeRoot;
 	public $notebook;
 	public $buffers = [];
-	public $currentSearchPos = FALSE;
 	public $searchTextCtrl = FALSE;
 
 	public $settings =
@@ -132,6 +131,8 @@ echo 'here';
 
 	public function onSearchWindowInput($ev)
 	{
+		$id = $this->getTabSelected();
+
 		if($ev->GetKeyCode() == 27)
 		{
 			if($this->searchWindow)
@@ -152,12 +153,12 @@ echo 'here';
 
 		if(in_array($ev->GetKeyCode(), [13, 342])) // enter or f3
 		{
-			$this->currentSearchPos += strlen($searchString);
+			$this->buffers[$id]['currentSearchPos'] += strlen($searchString);
 		}
 
-		$this->currentSearchPos = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->currentSearchPos);
-		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->currentSearchPos);
-		$this->buffers[$activeTabId]['textctrl']->SetSelection($this->currentSearchPos, $this->currentSearchPos+$searchStringLength);
+		$this->buffers[$id]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->buffers[$id]['currentSearchPos']);
+		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->buffers[$id]['currentSearchPos']);
+		$this->buffers[$activeTabId]['textctrl']->SetSelection($this->buffers[$id]['currentSearchPos'], $this->buffers[$id]['currentSearchPos']+$searchStringLength);
 	}
 
 	public function onSearchWindowClose($ev)
@@ -293,8 +294,8 @@ echo 'here';
 		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
-		//$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
-		//$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']); // ...
+		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
+		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']); // ...
 
 		//$this->notebook = new wxNotebook($rightPanel, wxID_ANY);
 		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
@@ -316,14 +317,21 @@ echo 'here';
 		$this->Centre( wxBOTH );
 	}
 
-	public function onTabClose($id)
+	public function onTabClose($ev)
 	{
-var_dump($id);
+                $selection = $this->notebook->GetSelection();
+
+                if($selection != -1)
+                {
+                        $page = $this->notebook->GetPage($ev->GetSelection());
+			unset($this->buffers[$page->GetId()]);
+                }
 	}
 
 	public function onTabChange($ev)
 	{
-echo "tab: ".$ev->GetSelection()." selected.\n";
+// TODO when auinotebook events fire - save search string and update the search string textCtrl between tabs 
+echo 'onTabChange: '.$this->getTabSelected()."\n";
 // fire call backs for tab..
 	}
 
@@ -365,6 +373,7 @@ echo "found!: ".$id."\n";
 		$this->buffers[$id]['file'] = $file;
 
 		$this->buffers[$id]['breakpoints'] = [];
+		$this->buffers[$id]['currentSearchPos'] = 0;
 
 		$this->buffers[$id]['panel'] = new wxPanel($this->notebook);
 		$this->buffers[$id]['sizer'] = new wxBoxSizer(wxVERTICAL);
@@ -588,17 +597,17 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 	public function onTreeClick($ev)
 	{
 		$data = $this->tree->GetItemData($this->tree->GetSelection());
-print_r($data);
+//print_r($data);
 		if(isset($data->project))
 		{
 			$this->activeProject = $data->project;
-echo 'project: '.$data->project."\n";
+//echo 'project: '.$data->project."\n";
 		}
 		else if(isset($data->filename))
 		{
 			if(is_file($data->filename))
 			{
-echo "file: ".$data->filename."\n";
+//echo "file: ".$data->filename."\n";
 				$this->addTab($data->name, $data->filename, TRUE);
 			}
 		}
