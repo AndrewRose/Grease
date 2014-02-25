@@ -29,10 +29,10 @@ class Grease extends wxFrame
 	public $notebook;
 	public $buffers = [];
 	public $searchTextCtrl = FALSE;
+	public $searchReplaceSearchTextCtrl = FALSE;
 
 	public $settings =
 	[
-
 		"theme" => "grease",
 		"font-size" => 10,
 		"font-face" => "Courier New",
@@ -85,9 +85,6 @@ class Grease extends wxFrame
 
 	public function onMarginClick($ev)
 	{
-//var_dump($ev);
-//echo 'margin click: '.$ev->GetPosition()."\n";
-
 		$lineNumber = $this->buffers[$this->getTabSelected()]['textctrl']->LineFromPosition($ev->GetPosition());
 
 		if(!isset($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]))
@@ -119,7 +116,6 @@ class Grease extends wxFrame
 
 		if($replace && $ev->GetKeyCode() == 343) // F4 replace
 		{
-echo 'hererere';
 			$this->buffers[$activeTabId]['textctrl']->ReplaceSelection($this->searchReplaceReplaceTextCtrl->GetValue());
 		}
 
@@ -190,7 +186,6 @@ echo 'hererere';
 	{
 		$keyCode = $ev->GetKeyCode();
 
-// TODO need to catch escape key whilst focus is in the searchCtrl textCtrl..
 		if($keyCode == 27)
 		{
 			if($this->searchWindow)
@@ -263,7 +258,7 @@ echo 'hererere';
 
 		print_r($this->theme);
 
-		$this->SetSizeHints( wxDefaultSize, wxDefaultSize );
+		$this->SetSizeHints(wxDefaultSize, wxDefaultSize);
 //		$this->initMenu($this);
 
 		$sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -321,7 +316,6 @@ echo 'hererere';
 		/* left panel */
 $leftPanelMaxSize = $this->GetSize()->GetWidth()/100*20;
 		$leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
-//$leftPanel->SetMinSize(new wxSize($leftPanelMaxSize, -1));
 		$leftSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->tree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
@@ -341,7 +335,6 @@ $leftPanelMaxSize = $this->GetSize()->GetWidth()/100*20;
 		/* right panel */
 $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
-//$rightPanel->SetMinSize(new wxSize($rightPanelMaxSize, -1));
 		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
@@ -381,7 +374,12 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$id = $page->GetId();
 		if($this->buffers[$id]['modified'])
 		{
-echo 'Tab is being closed but has modifications!'."\n";
+			$messageDialog = new wxMessageDialog($this, 'Tab is being closed but has modifications, save changes?', 'Save changes?', wxYES_NO);
+			$resp = $messageDialog->ShowModal();
+			if($resp == wxID_YES)
+			{
+				$this->buffers[$id]['textctrl']->SaveFile($this->buffers[$id]['file']);
+			}
 		}
 		unset($this->buffers[$id]);
 	}
@@ -389,7 +387,7 @@ echo 'Tab is being closed but has modifications!'."\n";
 	public function onTabChange($ev)
 	{
 // TODO when auinotebook events fire - save search string and update the search string textCtrl between tabs 
-echo 'onTabChange: '.$this->getTabSelected()."\n";
+// echo 'onTabChange: '.$this->getTabSelected()."\n";
 // fire call backs for tab..
 	}
 
@@ -412,10 +410,8 @@ echo 'onTabChange: '.$this->getTabSelected()."\n";
 		{
 			foreach($this->buffers as $idx => $buffer)
 			{
-echo $idx.' '.$buffer['file']."\n";
 				if($buffer['file'] == $file)
 				{
-echo "found!: ".$id."\n";
 					$this->notebook->SetSelection($buffer['position']);
 					return TRUE;
 				}
@@ -663,17 +659,14 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 	public function onTreeClick($ev)
 	{
 		$data = $this->tree->GetItemData($this->tree->GetSelection());
-//print_r($data);
 		if(isset($data->project))
 		{
 			$this->activeProject = $data->project;
-//echo 'project: '.$data->project."\n";
 		}
 		else if(isset($data->filename))
 		{
 			if(is_file($data->filename))
 			{
-//echo "file: ".$data->filename."\n";
 				$this->addTab($data->name, $data->filename, TRUE);
 			}
 		}
