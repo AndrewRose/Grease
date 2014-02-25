@@ -658,6 +658,7 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 
 	public function onTreeClick($ev)
 	{
+echo 'here';
 		$data = $this->tree->GetItemData($this->tree->GetSelection());
 		if(isset($data->project))
 		{
@@ -671,7 +672,6 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 			}
 		}
 
-		$this->tree->Unselect();
 		$ev->Skip();
 	}
 
