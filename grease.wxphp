@@ -30,6 +30,7 @@ class Grease extends wxFrame
 	public $buffers = [];
 	public $searchTextCtrl = FALSE;
 	public $searchReplaceSearchTextCtrl = FALSE;
+	public $consoleWindow;
 
 	public $settings =
 	[
@@ -184,6 +185,13 @@ class Grease extends wxFrame
 
 	public function onKeyDown($ev)
 	{
+		$id = $this->getTabSelected();
+
+		if(!$this->buffers[$id]['onTabModifiedConnected'])
+		{
+			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_CHANGE, [$this, 'onTabModified']);
+		}
+
 		$keyCode = $ev->GetKeyCode();
 
 		if($keyCode == 27)
@@ -286,6 +294,9 @@ class Grease extends wxFrame
 		$iconFindReplace = new wxBitmap();
 		$iconFindReplace->LoadFile('ico'.DIRECTORY_SEPARATOR.'findreplace.ico', wxBITMAP_TYPE_ICO);
 
+		$iconConsole = new wxBitmap();
+		$iconConsole->LoadFile('ico'.DIRECTORY_SEPARATOR.'console.ico', wxBITMAP_TYPE_ICO);
+
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
 		$this->Connect(1, wxEVT_COMMAND_MENU_SELECTED, [$this, "onAddTab"]);
 
@@ -298,16 +309,24 @@ class Grease extends wxFrame
 		$toolbar->AddTool( 6, "Save File As", $iconFileSaveAs, "Save File As", wxITEM_NORMAL);
 		$this->Connect(6, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTabAs"]);
 
+		$toolbar->AddSeparator();
+
 		$toolbar->AddTool( 10, "Find", $iconFind, "Find", wxITEM_NORMAL);
 		$this->Connect(10, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFind"]);
 
 		$toolbar->AddTool( 11, "Find / Replace", $iconFindReplace, "Find / Replace", wxITEM_NORMAL);
 		$this->Connect(11, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFindReplace"]);
 
+		$toolbar->AddSeparator();
+
+		$toolbar->AddTool( 12, "Console", $iconConsole, "Console", wxITEM_NORMAL);
+		$this->Connect(12, wxEVT_COMMAND_MENU_SELECTED, [$this,"onConsoleShow"]);
+
+		$toolbar->AddSeparator();
+
 		$toolbar->AddTool( 9, "About", $iconAbout, "About", wxITEM_NORMAL);
 		$this->Connect(9, wxEVT_COMMAND_MENU_SELECTED, [$this,"onAbout"]);
 
-		//$toolbar->AddSeparator();
 		$toolbar->Realize();
 
 		/* priamry splitter */
@@ -364,8 +383,44 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 		$this->createSearchDialog();
 		$this->createSearchReplaceDialog();
+		$this->createConsoleWindow();
 
 		$this->searchWindow->Hide();
+	}
+
+	public function createConsoleWindow()
+	{
+		$this->consoleWindow = new wxPanel($this, wxID_ANY, wxDefaultPosition, new wxSize(640, 480), wxTAB_TRAVERSAL, 'Console');
+		$this->consoleWindow->Hide();
+
+		$sizer = new wxBoxSizer(wxVERTICAL);
+
+		$textctrl = new wxStyledTextCtrl($this->consoleWindow, wxID_ANY);
+		$textentry = new wxTextCtrl($this->consoleWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+		$textentry->SetMaxSize(new wxSize(-1, 35));
+		$textentry->Connect(wxID_ANY, wxEVT_TEXT_ENTER, [$this, 'onConsoleCommandEnter']);
+
+		$sizer->Add($textctrl, 1, wxALL|wxEXPAND, 5);
+		$sizer->Add($textentry, 1, wxALL|wxEXPAND, 5);
+
+		$this->consoleWindow->SetSizer($sizer);
+	}
+
+	public function onConsoleCommandEnter($ev)
+	{
+
+	}
+
+	public function onConsoleShow($ev)
+	{
+		if($this->consoleWindow->IsShownOnScreen())
+		{
+			$this->consoleWindow->Hide();
+		}
+		else
+		{
+			$this->consoleWindow->Show();
+		}
 	}
 
 	public function onTabClose($ev)
@@ -429,6 +484,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$this->buffers[$id]['breakpoints'] = [];
 		$this->buffers[$id]['currentSearchPos'] = 0;
 		$this->buffers[$id]['modified'] = FALSE;
+		$this->buffers[$id]['onTabModifiedConnected'] = FALSE;
 
 		$this->buffers[$id]['panel'] = new wxPanel($this->notebook);
 		$this->buffers[$id]['sizer'] = new wxBoxSizer(wxVERTICAL);
@@ -484,7 +540,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 			$this->buffers[$id]['panel']->SetId($id);
 
-			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_CHANGE, [$this, 'onTabModified']);
+//			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_CHANGE, [$this, 'onTabModified']);
 			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_KEY_DOWN, [$this, 'onKeyDown']);
 
 			$this->buffers[$id]['textctrl']->SetSelection(0, 0);
@@ -658,7 +714,6 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 
 	public function onTreeClick($ev)
 	{
-echo 'here';
 		$data = $this->tree->GetItemData($this->tree->GetSelection());
 		if(isset($data->project))
 		{
