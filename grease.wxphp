@@ -190,6 +190,7 @@ class Grease extends wxFrame
 		if(!$this->buffers[$id]['onTabModifiedConnected'])
 		{
 			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_CHANGE, [$this, 'onTabModified']);
+			$this->buffers[$id]['onTabModifiedConnected'] = TRUE;
 		}
 
 		$keyCode = $ev->GetKeyCode();
