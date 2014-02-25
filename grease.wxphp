@@ -108,45 +108,42 @@ class Grease extends wxFrame
 		exit();
 	}
 
-	public function onSearchWindowSearch($ev)
+	public function onSearchReplaceWindowInput($ev)
 	{
-// TODO needs to tie in with onSearchWindowInput which searched as the user types
-echo "search!\n";
+		$this->onSearchWindowInput($ev, TRUE);
 	}
 
-	public function onSearchWindowKeyDown($ev)
-	{
-echo 'here';
-		$keyCode = $ev->GetKeyCode();
-
-// TODO need to catch escape key whilst focus is in the searchCtrl textCtrl..
-		if($keyCode == 27)
-		{
-			if($this->searchWindow)
-			{
-				$this->searchWindow->Hide();
-			}
-		}
-	}
-
-	public function onSearchWindowInput($ev)
+	public function onSearchWindowInput($ev, $replace=FALSE)
 	{
 		$activeTabId = $this->getTabSelected();
 
-		if($ev->GetKeyCode() == 343) // F4 replace
+		if($replace && $ev->GetKeyCode() == 343) // F4 replace
 		{
-			$this->buffers[$activeTabId]['textctrl']->ReplaceSelection('TEST');
+echo 'hererere';
+			$this->buffers[$activeTabId]['textctrl']->ReplaceSelection($this->searchReplaceReplaceTextCtrl->GetValue());
 		}
 
 		if($ev->GetKeyCode() == 27)
 		{
-			if($this->searchWindow)
+			if($replace)
+			{
+				$this->searchReplaceWindow->Hide();
+			}
+			else if($this->searchWindow)
 			{
 				$this->searchWindow->Hide();
 			}
 		}
 
-		$searchString = $this->searchTextCtrl->GetValue();
+		if($replace)
+		{
+			$searchString = $this->searchReplaceSearchTextCtrl->GetValue();
+		}
+		else
+		{
+			$searchString = $this->searchTextCtrl->GetValue();
+		}
+
 		if(!$searchString)
 		{
 			return;
@@ -172,6 +169,23 @@ echo 'here';
 		}
 	}
 
+	public function onFind($ev)
+	{
+		if($this->getTabSelected())
+		{
+			$this->searchWindow->Show();
+			$this->searchWindow->SetFocus();
+		}
+	}
+
+	public function onFindReplace($ev)
+	{
+		if($this->getTabSelected())
+		{
+			$this->searchReplaceWindow->Show();
+		}
+	}
+
 	public function onKeyDown($ev)
 	{
 		$keyCode = $ev->GetKeyCode();
@@ -187,15 +201,8 @@ echo 'here';
 
 		if($ev->ControlDown() && $keyCode == 70)
 		{
-			if($this->searchWindow)
-			{
-				$this->searchWindow->Show();
-				$this->searchWindow->SetFocus();
-			}
-			else
-			{
-				$this->createSearchDialog();
-			}
+			$this->searchWindow->Show();
+			$this->searchWindow->SetFocus();
 		}
 
 		$ev->Skip();
@@ -205,17 +212,38 @@ echo 'here';
 	{
 		$id = $this->getTabSelected();
 
-		$this->searchWindow = new wxPanel($this, wxID_ANY, $this->buffers[$id]['panel']->GetPosition(), new wxSize(220, 35));
+		$this->searchWindow = new wxPanel($this->notebook, wxID_ANY, wxDefaultPosition, new wxSize(220, 35));
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
-		$this->searchTextCtrl = new wxTextCtrl($this->searchWindow, 55, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+		$this->searchTextCtrl = new wxTextCtrl($this->searchWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
 		$sizer->add($this->searchTextCtrl, 1, wxALL|wxEXPAND, 5);
 
 		$this->searchWindow->SetSizer($sizer);
 		$this->searchWindow->Layout();
 
-		$this->searchTextCtrl->Connect(55, wxEVT_KEY_UP, [$this, 'onSearchWindowInput']);
-		$this->searchTextCtrl->SetFocus();
+		$this->searchTextCtrl->Connect(wxID_ANY, wxEVT_KEY_UP, [$this, 'onSearchWindowInput']);
+		$this->searchWindow->Hide();
+	}
+
+	public function createSearchReplaceDialog()
+	{
+		$id = $this->getTabSelected();
+
+		$this->searchReplaceWindow = new wxPanel($this->notebook, wxID_ANY, wxDefaultPosition, new wxSize(220, 70));
+		$sizer = new wxBoxSizer(wxVERTICAL);
+
+		$this->searchReplaceSearchTextCtrl = new wxTextCtrl($this->searchReplaceWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+		$sizer->add($this->searchReplaceSearchTextCtrl, 1, wxALL|wxEXPAND, 5);
+
+		$this->searchReplaceReplaceTextCtrl = new wxTextCtrl($this->searchReplaceWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+		$sizer->add($this->searchReplaceReplaceTextCtrl, 1, wxALL|wxEXPAND, 5);
+		
+		$this->searchReplaceWindow->SetSizer($sizer);
+		$this->searchReplaceWindow->Layout();
+
+		$this->searchReplaceSearchTextCtrl->Connect(wxID_ANY, wxEVT_KEY_UP, [$this, 'onSearchReplaceWindowInput']);
+		$this->searchReplaceReplaceTextCtrl->Connect(wxID_ANY, wxEVT_KEY_UP, [$this, 'onSearchReplaceWindowInput']);
+		$this->searchReplaceWindow->Hide();
 	}
 
 	public function __construct( $parent=null )
@@ -238,9 +266,9 @@ echo 'here';
 		$this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 //		$this->initMenu($this);
 
-		$sizer = new wxBoxSizer(wxVERTICAL);
+		$sizer = new wxBoxSizer(wxHORIZONTAL);
 
-		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
+		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
 
 		$IconNewTab = new wxBitmap();
 		$IconNewTab->LoadFile('ico'.DIRECTORY_SEPARATOR.'newtab.ico', wxBITMAP_TYPE_ICO);
@@ -257,6 +285,12 @@ echo 'here';
 		$iconAbout = new wxBitmap();
 		$iconAbout->LoadFile('ico'.DIRECTORY_SEPARATOR.'about.ico', wxBITMAP_TYPE_ICO);
 
+		$iconFind = new wxBitmap();
+		$iconFind->LoadFile('ico'.DIRECTORY_SEPARATOR.'find.ico', wxBITMAP_TYPE_ICO);
+
+		$iconFindReplace = new wxBitmap();
+		$iconFindReplace->LoadFile('ico'.DIRECTORY_SEPARATOR.'findreplace.ico', wxBITMAP_TYPE_ICO);
+
 		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
 		$this->Connect(1, wxEVT_COMMAND_MENU_SELECTED, [$this, "onAddTab"]);
 
@@ -269,13 +303,17 @@ echo 'here';
 		$toolbar->AddTool( 6, "Save File As", $iconFileSaveAs, "Save File As", wxITEM_NORMAL);
 		$this->Connect(6, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTabAs"]);
 
+		$toolbar->AddTool( 10, "Find", $iconFind, "Find", wxITEM_NORMAL);
+		$this->Connect(10, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFind"]);
+
+		$toolbar->AddTool( 11, "Find / Replace", $iconFindReplace, "Find / Replace", wxITEM_NORMAL);
+		$this->Connect(11, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFindReplace"]);
+
 		$toolbar->AddTool( 9, "About", $iconAbout, "About", wxITEM_NORMAL);
 		$this->Connect(9, wxEVT_COMMAND_MENU_SELECTED, [$this,"onAbout"]);
 
 		//$toolbar->AddSeparator();
 		$toolbar->Realize();
-
-		$sizer->Add($toolbar, 0, wxALL, 5 );
 
 		/* priamry splitter */
 		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
@@ -323,13 +361,18 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$primarySplitterWindow->SplitVertically($leftPanel, $rightPanel);
 		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
 
+		$sizer->Add($toolbar, 0, wxALL, 5 );
+
 		$this->SetSizer($sizer);
-
 		$this->Layout();
-
 
 		//$this->ShowFullScreen(true, wxFULLSCREEN_ALL);
 		$this->Centre( wxBOTH );
+
+		$this->createSearchDialog();
+		$this->createSearchReplaceDialog();
+
+		$this->searchWindow->Hide();
 	}
 
 	public function onTabClose($ev)
@@ -417,17 +460,22 @@ echo "found!: ".$id."\n";
 			$backgroundColor->SetRGB($this->theme['background-color']);
 			$foregroundSelection = new wxColour(0, 0, 0);
 			$backgroundSelection = new wxColour(255, 255, 255);
-			foreach($this->styles['php'] as $name => $style)
+
+			$fileType = end(explode('.', $file)); 
+			if(in_array($fileType, ['php', 'wxphp']))
 			{
-				$this->buffers[$id]['textctrl']->StyleSetFontAttr($style, $this->settings['font-size'], $this->settings['font-face'], false, false, false, wxFONTENCODING_DEFAULT);
+				foreach($this->styles['php'] as $name => $style)
+				{
+					$this->buffers[$id]['textctrl']->StyleSetFontAttr($style, $this->settings['font-size'], $this->settings['font-face'], false, false, false, wxFONTENCODING_DEFAULT);
 
-				$foregroundColor =  new wxColour();
-				$foregroundColor->SetRGB($this->theme[$name]);
+					$foregroundColor =  new wxColour();
+					$foregroundColor->SetRGB($this->theme[$name]);
 
-				$this->buffers[$id]['textctrl']->StyleSetBackground($style, $backgroundColor);
-				$this->buffers[$id]['textctrl']->StyleSetForeground($style, $foregroundColor);
-				$this->buffers[$id]['textctrl']->SetSelBackground($style, $backgroundSelection);
-				$this->buffers[$id]['textctrl']->SetSelForeground($style, $foregroundSelection);
+					$this->buffers[$id]['textctrl']->StyleSetBackground($style, $backgroundColor);
+					$this->buffers[$id]['textctrl']->StyleSetForeground($style, $foregroundColor);
+					$this->buffers[$id]['textctrl']->SetSelBackground($style, $backgroundSelection);
+					$this->buffers[$id]['textctrl']->SetSelForeground($style, $foregroundSelection);
+				}
 			}
 
 			if($file)
