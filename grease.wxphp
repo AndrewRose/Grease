@@ -30,7 +30,8 @@ class Grease extends wxFrame
 	public $buffers = [];
 	public $searchTextCtrl = FALSE;
 	public $searchReplaceSearchTextCtrl = FALSE;
-	public $consoleWindow;
+	public $consoleWindow = FALSE;
+	public $consoleTextctrl = FALSE;
 
 	public $settings =
 	[
@@ -396,12 +397,12 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
-		$textctrl = new wxStyledTextCtrl($this->consoleWindow, wxID_ANY);
+		$this->consoleTextctrl = new wxStyledTextCtrl($this->consoleWindow, wxID_ANY);
 		$textentry = new wxTextCtrl($this->consoleWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
 		$textentry->SetMaxSize(new wxSize(-1, 35));
 		$textentry->Connect(wxID_ANY, wxEVT_TEXT_ENTER, [$this, 'onConsoleCommandEnter']);
 
-		$sizer->Add($textctrl, 1, wxALL|wxEXPAND, 5);
+		$sizer->Add($this->consoleTextctrl, 1, wxALL|wxEXPAND, 5);
 		$sizer->Add($textentry, 1, wxALL|wxEXPAND, 5);
 
 		$this->consoleWindow->SetSizer($sizer);
@@ -409,7 +410,12 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 	public function onConsoleCommandEnter($ev)
 	{
+		ob_start();
+		eval($ev->GetString());
+		$ret = ob_get_contents();
+		ob_end_clean();
 
+		$this->consoleTextctrl->AppendText($ret);
 	}
 
 	public function onConsoleShow($ev)
