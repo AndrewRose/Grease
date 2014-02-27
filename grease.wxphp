@@ -131,6 +131,7 @@ class Grease extends wxFrame
 			{
 				$this->searchWindow->Hide();
 			}
+			return;
 		}
 
 		if($replace)
@@ -154,7 +155,31 @@ class Grease extends wxFrame
 			$this->buffers[$activeTabId]['currentSearchPos'] += strlen($searchString);
 		}
 
-		$this->buffers[$activeTabId]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->buffers[$activeTabId]['currentSearchPos']);
+		$newpos = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, $this->buffers[$activeTabId]['currentSearchPos']);
+
+		if($newpos !== FALSE)
+		{
+			$this->buffers[$activeTabId]['currentSearchPos'] = $newpos;
+		}
+		else
+		{
+			$messageDialog = new wxMessageDialog($this, 'Unable to find search string, start from begining of document?', 'Find', wxYES_NO);
+			$resp = $messageDialog->ShowModal();
+			if($resp == wxID_YES)
+			{
+				$this->buffers[$activeTabId]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, 0);
+				if($this->buffers[$activeTabId]['currentSearchPos'] === FALSE)
+				{
+					new wxMessageDialog($this, 'Unable to find search string in document', 'Find', wxOK);
+					return;
+				}
+			}
+			else
+			{
+				return;
+			}
+		}
+
 		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->buffers[$activeTabId]['currentSearchPos']);
 		$this->buffers[$activeTabId]['textctrl']->SetSelection($this->buffers[$activeTabId]['currentSearchPos'], $this->buffers[$activeTabId]['currentSearchPos']+$searchStringLength);
 	}
@@ -169,7 +194,16 @@ class Grease extends wxFrame
 
 	public function onFind($ev)
 	{
-		if($this->getTabSelected())
+		if($this->searchReplaceWindow->IsShownOnScreen())
+		{
+			$this->searchReplaceWindow->hide();
+		}
+
+		if($this->searchWindow->IsShownOnScreen())
+		{
+			$this->searchWindow->hide();
+		}
+		else if($this->getTabSelected())
 		{
 			$this->searchWindow->Show();
 			$this->searchWindow->SetFocus();
@@ -178,7 +212,16 @@ class Grease extends wxFrame
 
 	public function onFindReplace($ev)
 	{
-		if($this->getTabSelected())
+		if($this->searchWindow->IsShownOnScreen())
+		{
+			$this->searchWindow->hide();
+		}
+
+		if($this->searchReplaceWindow->IsShownOnScreen())
+		{
+			$this->searchReplaceWindow->hide();
+		}
+		else if($this->getTabSelected())
 		{
 			$this->searchReplaceWindow->Show();
 		}
@@ -398,6 +441,11 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->consoleTextctrl = new wxStyledTextCtrl($this->consoleWindow, wxID_ANY);
+		$this->consoleTextctrl->StyleSetForeground (wxSTC_STYLE_LINENUMBER, new wxColour (75, 75, 75) );
+		$this->consoleTextctrl->StyleSetBackground (wxSTC_STYLE_LINENUMBER, new wxColour (220, 220, 220));
+		$this->consoleTextctrl->SetMarginType (0, wxSTC_MARGIN_NUMBER);
+
+
 		$textentry = new wxTextCtrl($this->consoleWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
 		$textentry->SetMaxSize(new wxSize(-1, 35));
 		$textentry->Connect(wxID_ANY, wxEVT_TEXT_ENTER, [$this, 'onConsoleCommandEnter']);
@@ -410,12 +458,20 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 	public function onConsoleCommandEnter($ev)
 	{
+		$cmd = $ev->GetString();
 		ob_start();
-		eval($ev->GetString());
+		eval($cmd);
 		$ret = ob_get_contents();
 		ob_end_clean();
+		$this->consoleTextctrl->AppendText('>>> '.$cmd."\n".$ret."\n");
 
-		$this->consoleTextctrl->AppendText($ret);
+//		$this->consoleTextctrl->ScrollToEnd();
+
+		$lineCount = substr_count($ret, "\n")+2;
+		while($lineCount--)
+		{
+			$this->consoleTextctrl->LineScrollDown();
+		}
 	}
 
 	public function onConsoleShow($ev)
