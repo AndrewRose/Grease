@@ -3,6 +3,8 @@ Grease
 
 PHP editor written in PHP using wxPHP .. still early days.
 
+![alt tag](http://wxphp.org/image/application/grease/archlinux2-copy.png)
+
 To get up and running under Archlinux, download https://aur.archlinux.org/packages/php-wxwidgets-git/ and build with makepkg.  Setup php.ini to load wxwidgets.so module and run `php grease.wxphp` from the commandline.
 
 To use search hit CTRL+F or click icon.  Enter to cycle search. Escape to close dialog.
