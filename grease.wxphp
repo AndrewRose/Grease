@@ -22,6 +22,8 @@
     along with Grease.  If not, see <http://www.gnu.org/licenses/>
 */
 
+include_once('libxdebugd.php');
+
 class Grease extends wxFrame
 {
 	public $tree;
@@ -32,6 +34,14 @@ class Grease extends wxFrame
 	public $searchReplaceSearchTextCtrl = FALSE;
 	public $consoleWindow = FALSE;
 	public $consoleTextctrl = FALSE;
+
+	public $activeDebugSession = FALSE;
+	public $xdebug = FALSE;
+
+	public $debugTree;
+	public $debugTreeRoot;
+
+	public $filesOpen = [];
 
 	public $settings =
 	[
@@ -92,11 +102,12 @@ class Grease extends wxFrame
 		if(!isset($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]))
 		{
 			$this->buffers[$this->getTabSelected()]['textctrl']->MarkerAdd($lineNumber, 0);
-			$this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber] = TRUE;
+			$this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber] = $this->onDebugBreakpointSetLine($this->buffers[$this->getTabSelected()]['file'], $lineNumber+1);
 		}
 		else
 		{
 			$this->buffers[$this->getTabSelected()]['textctrl']->MarkerDelete($lineNumber, 0);
+			$this->onDebugBreakpointRemoveLine($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]);
 			unset($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]);
 		}
 	}
@@ -294,12 +305,158 @@ class Grease extends wxFrame
 		$this->searchReplaceWindow->Hide();
 	}
 
+	public function onDebugStart()
+	{
+		if(!$this->xdebug->connected)
+		{
+			$this->xdebug->connect();
+			if(!$this->xdebug->connected)
+			{
+				wxMessageBox('Failed to connect to xdebugd!', 'Error');
+				return;
+			}
+		}
+
+		if(!$this->activeDebugSession)
+		{
+			$data = json_decode($this->xdebug->getSessions(), TRUE);
+
+			if(!is_array($data) || empty($data))
+			{
+				wxMessageBox('No active debugging sessions available', 'Error');
+				return;
+			}
+
+			$sessions = array_keys($data, TRUE);
+			$messageDialog = new wxSingleChoiceDialog($this, 'Select session', 'Select active debugging session', count($sessions), $sessions, NULL, wxCHOICEDLG_STYLE);
+			$resp = $messageDialog->ShowModal();
+
+			if(!$this->xdebug->init($messageDialog->GetStringSelection()))
+			{
+echo "failed to init session..";
+return;
+			}
+			$this->activeDebugSession = $messageDialog->GetStringSelection();
+		}
+		else
+		{
+			$ret = json_decode($this->xdebug->run($this->activeDebugSession), TRUE);
+			if($ret['status'] == 'break')
+			{
+				$this->debugOpenFileAndOrMoveToLine($ret['filename'], $ret['lineno']);
+			}
+		}
+	}
+
+	public function onDebugBreakpointSetLine($filename, $lineno)
+	{
+		if(!$this->xdebug->connected || !$this->activeDebugSession)
+		{
+			return;
+		}
+
+		$this->xdebug->breakpointSetLine($this->activeDebugSession, $filename, $lineno);
+	}
+
+	public function onDebugBreakpointRemoveLine($breakpointId)
+	{
+		if(!$this->xdebug->connected || !$this->activeDebugSession)
+		{
+			return;
+		}
+
+		$this->xdebug->breakpointRemoveLine($this->activeDebugSession, $breakpointId);
+	}
+	
+	public function onDebugStop()
+	{
+		if(!$this->xdebug->connected)
+		{
+			wxMessageBox('Not connected to xdebugd!', 'Error');
+			return;
+		}
+
+		if(!$this->activeDebugSession)
+		{
+			wxMessageBox('No active debug session running!', 'Error');
+			return;
+		}
+
+		$this->xdebug->stop($this->activeDebugSession);
+		$this->activeDebugSession = FALSE;
+	}
+
+	public function debugOpenFileAndOrMoveToLine($filename, $lineno)
+	{
+		if(!isset($this->filesOpen[str_replace('file://', '', $filename)]))
+		{
+			$filename = str_replace('file://', '', $filename);
+			$id = $this->addTab($filename, $filename, $focus=TRUE);
+			$buffer = $this->buffers[$id];
+			$this->filesOpen[$filename] = $id;
+		}
+		else
+		{
+			$buffer = $this->buffers[$this->filesOpen[str_replace('file://', '', $filename)]];
+			$this->notebook->SetSelection($buffer['position']);
+		}
+
+		$lineno = $lineno-1;
+		//$start GetLineSelStartPosition($lineno);
+		//$end = $buffer['textctrl']->GetLineSelEndPosition($lineno);
+
+		$buffer['textctrl']->SetCurrentPos($buffer['textctrl']->GetLineSelStartPosition($lineno));
+
+		$buffer['textctrl']->ScrollToLine($lineno);
+		if($buffer['debugMarkerPosition'])
+		{
+			$buffer['textctrl']->MarkerDelete($buffer['debugMarkerPosition'], 1);
+		}
+		$buffer['textctrl']->MarkerAdd($lineno, 1);
+		$buffer['debugMarkerPosition'] = $lineno;
+	}
+
+	public function onDebugStepInto()
+	{
+		if(!$this->xdebug)
+		{
+			wxMessageBox('Not connected to xdebugd!', 'Error');
+			return;
+		}
+
+		if(!$this->activeDebugSession)
+		{
+			wxMessageBox('No active debug session running!', 'Error');
+			return;
+		}
+
+
+		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
+		$this->debugTree->DeleteChildren($this->debugTreeRoot);
+		$this->scanDebugContext($this->debugTreeRoot, json_decode($this->xdebug->getContext($this->activeDebugSession), TRUE));
+		$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
+	}
+
+	public function onDebugStepOver()
+	{
+
+	}
+
+	public function onDebugStepOut()
+	{
+
+	}
+
 	public function __construct( $parent=null )
 	{
 		//echo json_encode($this->settings, JSON_PRETTY_PRINT);
 
 		//parent::__construct(null , wxID_ANY, , wxDefaultPosition, wxDefaultSize);
-		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1024,768 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+
+//		$this->debugger = new Debugger($this);
+		//$this->debugger>Create();
+//		$this->debugger->Run();
 
 		if(file_exists('.grease'))
 		{
@@ -318,59 +475,41 @@ class Grease extends wxFrame
 
 		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
 
-		$IconNewTab = new wxBitmap();
-		$IconNewTab->LoadFile('ico'.DIRECTORY_SEPARATOR.'newtab.ico', wxBITMAP_TYPE_ICO);
+		$icons  = [
+			'newtab' => ['name' => 'New Tab', 'description' => 'New Tab', 'callback' => 'onAddTab'],
+			'fileopen' => ['name' => 'Open File', 'description' => 'Open File', 'callback' => 'onOpenFile'],
+			'filesave' => ['name' => 'Save Tab', 'description' => 'Save Tab', 'callback' => 'onSaveTab'],
+			'filesaveas' => ['name' => 'Save File As', 'description' => 'Save File As', 'callback' => 'onSaveTabAs'],
+			FALSE,
+			'find' => ['name' => 'Find', 'description' => 'Find', 'callback' => 'onFind'],
+			'findreplace' => ['name' => 'Find / Replace', 'description' => 'Find / Replace', 'callback' => 'onFindReplace'],
+			FALSE,
+			'debug_run' => ['name' => 'Debug - Start / Run', 'description' => 'Debug - Start / Run', 'callback' => 'onDebugStart'],
+			'debug_step_into' => ['name' => 'Debug - Step Into', 'description' => "Debug - Step Into\nSteps to the next statement, if there is a function call involved it will break on the first statement in that function", 'callback' => 'onDebugStepInto'],
+			/*'debug_step_out' => ['name' => 'Debug - Step Out', 'description' => "Debug - Step Out\nSteps out of the current scope and breaks on the statement after returning from the current function", 'callback' => 'onDebugStepOut'],
+			'debug_step_over' => ['name' => 'Debug - Step Over', 'description' => "Debug - Step Over\nSteps to the next statement, if there is a function call on the line from which the step_over is issued then the debugger engine will stop at the statement after the function call in the same scope as from where the command was issued", 'callback' => 'onDebugStepOver'],*/
+			'debug_stop' => ['name' => 'Debug - Stop', 'description' => 'Debug - Stop', 'callback' => 'onDebugStop'],
+			FALSE,
+			'console' => ['name' => 'Console', 'description' => 'Console', 'callback' => 'onConsoleShow'],
+			'about' => ['name' => 'About', 'description' => 'About', 'callback' => 'onAbout']
+		];
 
-		$iconFileOpen = new wxBitmap();
-		$iconFileOpen->LoadFile('ico'.DIRECTORY_SEPARATOR.'fileopen.ico', wxBITMAP_TYPE_ICO);
-
-		$iconFileSave = new wxBitmap();
-		$iconFileSave->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesave.ico', wxBITMAP_TYPE_ICO);
-
-		$iconFileSaveAs = new wxBitmap();
-		$iconFileSaveAs->LoadFile('ico'.DIRECTORY_SEPARATOR.'filesaveas.ico', wxBITMAP_TYPE_ICO);
-
-		$iconAbout = new wxBitmap();
-		$iconAbout->LoadFile('ico'.DIRECTORY_SEPARATOR.'about.ico', wxBITMAP_TYPE_ICO);
-
-		$iconFind = new wxBitmap();
-		$iconFind->LoadFile('ico'.DIRECTORY_SEPARATOR.'find.ico', wxBITMAP_TYPE_ICO);
-
-		$iconFindReplace = new wxBitmap();
-		$iconFindReplace->LoadFile('ico'.DIRECTORY_SEPARATOR.'findreplace.ico', wxBITMAP_TYPE_ICO);
-
-		$iconConsole = new wxBitmap();
-		$iconConsole->LoadFile('ico'.DIRECTORY_SEPARATOR.'console.ico', wxBITMAP_TYPE_ICO);
-
-		$toolbar->AddTool( 1, "New Tab", $IconNewTab, "New Tab", wxITEM_NORMAL);
-		$this->Connect(1, wxEVT_COMMAND_MENU_SELECTED, [$this, "onAddTab"]);
-
-		$toolbar->AddTool( 7, "Open File", $iconFileOpen, "Open File", wxITEM_NORMAL);
-		$this->Connect(7, wxEVT_COMMAND_MENU_SELECTED, [$this,"onOpenFile"]);
-
-		$toolbar->AddTool(8, "Save File", $iconFileSave, "Save File", wxITEM_NORMAL);
-		$this->Connect(8, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTab"]);
-
-		$toolbar->AddTool( 6, "Save File As", $iconFileSaveAs, "Save File As", wxITEM_NORMAL);
-		$this->Connect(6, wxEVT_COMMAND_MENU_SELECTED, [$this,"onSaveTabAs"]);
-
-		$toolbar->AddSeparator();
-
-		$toolbar->AddTool( 10, "Find", $iconFind, "Find", wxITEM_NORMAL);
-		$this->Connect(10, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFind"]);
-
-		$toolbar->AddTool( 11, "Find / Replace", $iconFindReplace, "Find / Replace", wxITEM_NORMAL);
-		$this->Connect(11, wxEVT_COMMAND_MENU_SELECTED, [$this,"onFindReplace"]);
-
-		$toolbar->AddSeparator();
-
-		$toolbar->AddTool( 12, "Console", $iconConsole, "Console", wxITEM_NORMAL);
-		$this->Connect(12, wxEVT_COMMAND_MENU_SELECTED, [$this,"onConsoleShow"]);
-
-		$toolbar->AddSeparator();
-
-		$toolbar->AddTool( 9, "About", $iconAbout, "About", wxITEM_NORMAL);
-		$this->Connect(9, wxEVT_COMMAND_MENU_SELECTED, [$this,"onAbout"]);
+		$i = 1;
+		foreach($icons as $iconName => $params)
+		{
+			if(!$params)
+			{
+				$toolbar->AddSeparator();
+			}
+			else
+			{
+				$icon = new wxBitmap();
+				$icon->LoadFile('ico'.DIRECTORY_SEPARATOR.$iconName.'.ico', wxBITMAP_TYPE_ICO);
+				$toolbar->AddTool($i, $params['name'], $icon, $params['description'], wxITEM_NORMAL);
+				$this->Connect($i, wxEVT_COMMAND_MENU_SELECTED, [$this, $params['callback']]);
+				$i++;
+			}
+		}
 
 		$toolbar->Realize();
 
@@ -378,11 +517,14 @@ class Grease extends wxFrame
 		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
 
 		/* left panel */
-$leftPanelMaxSize = $this->GetSize()->GetWidth()/100*20;
+$leftPanelMaxSize = 200; //($this->GetSize()->GetWidth()/100)*20;
 		$leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
 		$leftSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->tree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+
+		$this->debugTree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+		$this->debugTreeRoot = $this->debugTree->AddRoot('wxphp');
 
 		$this->treeRoot = $this->tree->AddRoot('wxphp');
 
@@ -392,12 +534,16 @@ $leftPanelMaxSize = $this->GetSize()->GetWidth()/100*20;
 		}
 
 		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
+
 		$leftSizer->Add($this->tree, 1, wxALL|wxEXPAND, 5);
+		$leftSizer->Add($this->debugTree, 1, wxALL|wxEXPAND, 5);
+
+
 		$leftPanel->SetSizer($leftSizer);
 		$leftPanel->Layout();
 
 		/* right panel */
-$rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
+$rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->GetSize()->GetWidth()/100)*80;
 		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
 		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
@@ -416,7 +562,10 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 
 		/* main splitter window */
 		$primarySplitterWindow->SplitVertically($leftPanel, $rightPanel);
+
 		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
+
+$primarySplitterWindow->SetSashGravity(0.0);
 
 		$sizer->Add($toolbar, 0, wxALL, 5 );
 
@@ -431,6 +580,9 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$this->createConsoleWindow();
 
 		$this->searchWindow->Hide();
+
+		$this->xdebug = new libxdebugd();
+		$this->xdebug->connect();
 	}
 
 	public function createConsoleWindow()
@@ -535,6 +687,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 				}
 			}
 			$this->buffers[$id]['fileMd5'] = md5(file_get_contents($file));
+			$this->filesOpen[realpath($file)] = $id;
 		}
 		else
 		{
@@ -548,6 +701,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$this->buffers[$id]['currentSearchPos'] = 0;
 		$this->buffers[$id]['modified'] = FALSE;
 		$this->buffers[$id]['onTabModifiedConnected'] = FALSE;
+		$this->buffers[$id]['debugMarkerPosition'] = FALSE;
 
 		$this->buffers[$id]['panel'] = new wxPanel($this->notebook);
 		$this->buffers[$id]['sizer'] = new wxBoxSizer(wxVERTICAL);
@@ -611,6 +765,10 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 			// setup the debugging margin
 			$this->buffers[$id]['textctrl']->MarkerDefine(1, wxSTC_MARK_CIRCLE, wxRED);
 			$this->buffers[$id]['textctrl']->SetMarginSensitive(1, TRUE);
+
+			$this->buffers[$id]['textctrl']->MarkerDefine(2, wxSTC_MARK_ARROW, wxRED);
+			$this->buffers[$id]['textctrl']->SetMarginSensitive(2, TRUE);
+
 			$this->buffers[$id]['textctrl']->Connect(wxID_ANY, wxEVT_STC_MARGINCLICK, [$this, 'onMarginClick']);
 
 		}
@@ -628,12 +786,32 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()/100*80;
 		$this->notebook->AddPage($this->buffers[$id]['panel'], $title, $focus);
 		$this->buffers[$id]['position'] = $this->notebook->GetSelection();
 
-		$id++;
+		return $id++;
 	}
 
 	public function onWebviewNavigating($ev)
 	{
 echo $ev->GetURL()."\n";
+	}
+
+	public function scanDebugContext($parentNode, $tree)
+	{
+print_r($tree);
+		if(is_array($tree))
+		{
+			foreach($tree as $node => $props)
+			{
+				if($props['type'] == 'array' || $props['type'] == 'object')
+				{
+					$nodeId = $this->debugTree->AppendItem($parentNode, $node.' = '.$props['type']);
+					$this->scanDebugContext($nodeId, $props['properties']);
+				}
+				else
+				{
+					$this->debugTree->AppendItem($parentNode, $node.' = '.$props['value']);
+				}
+			}
+		}
 	}
 
 	public function scanDirectory($dir, $parentNode, $tree)
@@ -765,6 +943,7 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 			{
 				$this->buffers[$id]['textctrl']->SaveFile($file);
 				$this->buffers[$id]['file'] = $file;
+				$this->filesOpen[realpath($file)] = $id;
 				$this->buffers[$id]['title'] = $filename;
 				$this->buffers[$id]['fileMd5'] = md5(file_get_contents($this->buffers[$id]['file']));
 				$this->notebook->SetPageText($this->notebook->GetSelection(), $filename);
@@ -838,6 +1017,26 @@ class myApp extends wxApp
 	}
 }
 
+class Debugger extends wxThread
+{
+	function __construct($parent)
+	{
+		parent::__construct(wxTHREAD_JOINABLE);
+		$this->parent = $parent;
+	}
+
+	function Entry()
+	{
+echo 'entry';
+
+
+while(1)
+{
+$this->YieldMethod();
+echo "awake\n";
+}
+	}
+}
 /*$pid = pcntl_fork();
 if($pid)
 {
