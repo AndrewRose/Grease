@@ -133,7 +133,7 @@ class Grease extends wxFrame
 			else
 			{
 				$icon = new wxBitmap();
-				$icon->LoadFile('ico'.DIRECTORY_SEPARATOR.$iconName.'.ico', wxBITMAP_TYPE_ICO);
+				$icon->LoadFile(dirname(__FILE__).'/ico'.DIRECTORY_SEPARATOR.$iconName.'.ico', wxBITMAP_TYPE_ICO);
 				$toolbar->AddTool($i, $params['name'], $icon, $params['description'], wxITEM_NORMAL);
 				$this->Connect($i, wxEVT_COMMAND_MENU_SELECTED, [$this, $params['callback']]);
 				$i++;
