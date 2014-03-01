@@ -27,5 +27,9 @@
             "wxSTC_HPHP_HSTRING_VARIABLE": "0xFF00FF",
             "wxSTC_HPHP_OPERATOR": "0xFF9999"
         }
+    },
+    "state": {
+        "files": {
+        }
     }
 }
