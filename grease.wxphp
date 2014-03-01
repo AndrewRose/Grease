@@ -238,6 +238,12 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 
 		$this->xdebug = new libxdebugd();
 		$this->xdebug->connect();
+
+		foreach($this->settings['state']['files'] as $file => $state)
+		{
+			$bufferId = $this->addTab(basename($file), $file);
+			$this->filesOpen[$file] = $bufferId;
+		}
 	}
 
 	public function onMarginClick($ev)
@@ -470,7 +476,31 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 			$resp = $messageDialog->ShowModal();
 			if($resp == wxID_YES)
 			{
+				$id = $this->getTabSelected();
+				$key = rand();
+				$file = $this->buffers[$id]['file'];
+// TODO handle configuration options for xdebug from config..
+				exec('php -d xdebug.remote_host='.$this->settings['xdebug']['host'].' -d xdebug.remote_port='.$this->settings['xdebug']['port'].' -d xdebug.remote_autostart=1 -d xdebug.idekey='.$key.' '.$file.' > /dev/null &');
+// As the process is sent to the background we need to keep poking xdebugd to see if the process has started and registered.
+				$retries = 10;
+				while($retries--)
+				{
+					if($this->xdebug->init($key))
+					{
+						break;
+					}
+					usleep(100000);
+				}
 
+				if($retries)
+				{
+					$this->activeDebugSession = $key;
+					if(!$this->debugContext->IsShown())
+					{
+						$this->debugShowPanels();
+					}
+					$this->debugHonorBreakpoints();
+				}
 				return;
 			}
 
@@ -628,7 +658,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 		if(!isset($this->filesOpen[str_replace('file://', '', $filename)]))
 		{
 			$filename = str_replace('file://', '', $filename);
-			$bufferId = $this->addTab(basename($filename), $filename, $focus=TRUE);
+			$bufferId = $this->addTab(basename($filename), $filename, TRUE);
 			$this->filesOpen[$filename] = $bufferId;
 			$this->readonlyBuffers[] = $bufferId;
 			$this->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
@@ -830,6 +860,11 @@ print_r($data);
 				$this->buffers[$id]['textctrl']->SaveFile($this->buffers[$id]['file']);
 			}
 		}
+
+// TODO this needs to be put into a method
+unset($this->settings['state']['files'][$this->buffers[$id]['file']]);
+file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
+
 		unset($this->buffers[$id]);
 	}
 
@@ -932,8 +967,9 @@ print_r($data);
 			{
 				//$this->buffers[$id]['textctrl']->SetText(file_get_contents($file));
 				$this->buffers[$id]['textctrl']->LoadFile($file);
-//$this->settings['projects']['Grease']['state']['files'][$file] = TRUE;
-//file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
+
+$this->settings['state']['files'][$file] = TRUE;
+file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
 			}
 
 			$this->buffers[$id]['panel']->SetId($id);
