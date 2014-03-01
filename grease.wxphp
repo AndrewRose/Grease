@@ -26,6 +26,7 @@ include_once('libxdebugd.php');
 
 class Grease extends wxFrame
 {
+	public $settingsFile;
 	public $tree;
 	public $treeRoot;
 	public $notebook;
@@ -50,31 +51,45 @@ class Grease extends wxFrame
 
 	public $settings =
 	[
-		"theme" => "grease",
-		"font-size" => 10,
-		"font-face" => "Courier New",
+		'theme' => 'grease',
+		'font-size' => 10,
+		'font-face' => 'Courier New',
 
-		"projects" =>
+		'xdebug' =>
+		[
+			'host' => '127.0.0.1',
+			'port' => '9000'
+		],
+
+		'projects' =>
 		[
 
 		],
 
-		"themes" =>
+		'themes' =>
 		[
-			"grease" =>
+			'grease' =>
 			[
-				"background-color" => "0xC0C0C0",
-				"wxSTC_STYLE_DEFAULT" => "0x1E5A14",
-				"wxSTC_HPHP_DEFAULT" => "0x1E5A14",
-				"wxSTC_HPHP_HSTRING" => "0x1E5A14",
-				"wxSTC_HPHP_SIMPLESTRING" => "0x1E5A14",
-				"wxSTC_HPHP_WORD" => "0x1E5A14",
-				"wxSTC_HPHP_NUMBER" => "0x1E5A14",
-				"wxSTC_HPHP_VARIABLE" => "0x1E5A14",
-				"wxSTC_HPHP_COMMENT" => "0x1E5A14",
-				"wxSTC_HPHP_COMMENTLINE" => "0x1E5A14",
-				"wxSTC_HPHP_HSTRING_VARIABLE" => "0x1E5A14",
-				"wxSTC_HPHP_OPERATOR" => "0x1E5A14"
+				'background-color' => '0xC0C0C0',
+				'wxSTC_STYLE_DEFAULT' => '0x1E5A14',
+				'wxSTC_HPHP_DEFAULT' => '0x1E5A14',
+				'wxSTC_HPHP_HSTRING' => '0x1E5A14',
+				'wxSTC_HPHP_SIMPLESTRING' => '0x1E5A14',
+				'wxSTC_HPHP_WORD' => '0x1E5A14',
+				'wxSTC_HPHP_NUMBER' => '0x1E5A14',
+				'wxSTC_HPHP_VARIABLE' => '0x1E5A14',
+				'wxSTC_HPHP_COMMENT' => '0x1E5A14',
+				'wxSTC_HPHP_COMMENTLINE' => '0x1E5A14',
+				'wxSTC_HPHP_HSTRING_VARIABLE' => '0x1E5A14',
+				'wxSTC_HPHP_OPERATOR' => '0x1E5A14'
+			]
+		],
+
+		'state' =>
+		[
+			'files' =>
+			[
+
 			]
 		]
 	];
@@ -82,19 +97,19 @@ class Grease extends wxFrame
 
 	public $styles =
 	[
-		"php" =>
+		'php' =>
 		[
-			"wxSTC_STYLE_DEFAULT" => wxSTC_STYLE_DEFAULT,
-			"wxSTC_HPHP_DEFAULT" => wxSTC_HPHP_DEFAULT,
-			"wxSTC_HPHP_HSTRING" => wxSTC_HPHP_HSTRING,
-			"wxSTC_HPHP_SIMPLESTRING" => wxSTC_HPHP_SIMPLESTRING,
-			"wxSTC_HPHP_WORD" => wxSTC_HPHP_WORD,
-			"wxSTC_HPHP_NUMBER" => wxSTC_HPHP_NUMBER,
-			"wxSTC_HPHP_VARIABLE" => wxSTC_HPHP_VARIABLE,
-			"wxSTC_HPHP_COMMENT" => wxSTC_HPHP_COMMENT,
-			"wxSTC_HPHP_COMMENTLINE" => wxSTC_HPHP_COMMENTLINE,
-			"wxSTC_HPHP_HSTRING_VARIABLE" => wxSTC_HPHP_HSTRING_VARIABLE,
-			"wxSTC_HPHP_OPERATOR" => wxSTC_HPHP_OPERATOR
+			'wxSTC_STYLE_DEFAULT' => wxSTC_STYLE_DEFAULT,
+			'wxSTC_HPHP_DEFAULT' => wxSTC_HPHP_DEFAULT,
+			'wxSTC_HPHP_HSTRING' => wxSTC_HPHP_HSTRING,
+			'wxSTC_HPHP_SIMPLESTRING' => wxSTC_HPHP_SIMPLESTRING,
+			'wxSTC_HPHP_WORD' => wxSTC_HPHP_WORD,
+			'wxSTC_HPHP_NUMBER' => wxSTC_HPHP_NUMBER,
+			'wxSTC_HPHP_VARIABLE' => wxSTC_HPHP_VARIABLE,
+			'wxSTC_HPHP_COMMENT' => wxSTC_HPHP_COMMENT,
+			'wxSTC_HPHP_COMMENTLINE' => wxSTC_HPHP_COMMENTLINE,
+			'wxSTC_HPHP_HSTRING_VARIABLE' => wxSTC_HPHP_HSTRING_VARIABLE,
+			'wxSTC_HPHP_OPERATOR' => wxSTC_HPHP_OPERATOR
 		]
 	];
 
@@ -148,9 +163,11 @@ class Grease extends wxFrame
 	{
 		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 
-		if(file_exists('.grease'))
+		$this->settingsFile = $_SERVER['HOME'].'/.grease';
+
+		if(file_exists($this->settingsFile))
 		{
-			$this->settings = json_decode(file_get_contents('.grease'), TRUE);
+			$this->settings = json_decode(file_get_contents($this->settingsFile), TRUE);
 		}
 
 		$this->Connect(wxEVT_CLOSE_WINDOW, [$this, 'onWindowClose']);
@@ -863,7 +880,7 @@ print_r($data);
 
 // TODO this needs to be put into a method
 unset($this->settings['state']['files'][$this->buffers[$id]['file']]);
-file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
+file_put_contents($this->settingsFile, json_encode($this->settings, JSON_PRETTY_PRINT));
 
 		unset($this->buffers[$id]);
 	}
@@ -969,7 +986,7 @@ file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
 				$this->buffers[$id]['textctrl']->LoadFile($file);
 
 $this->settings['state']['files'][$file] = TRUE;
-file_put_contents('.grease', json_encode($this->settings, JSON_PRETTY_PRINT));
+file_put_contents($this->settingsFile, json_encode($this->settings, JSON_PRETTY_PRINT));
 			}
 
 			$this->buffers[$id]['panel']->SetId($id);
