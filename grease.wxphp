@@ -844,6 +844,7 @@ if($pid)
 	exit();
 }*/
 
+wxInitAllImageHandlers();
 $xt = new myApp();
 wxApp::SetInstance($xt);
 wxEntry();
