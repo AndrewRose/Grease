@@ -36,6 +36,8 @@ class Grease extends wxFrame
 	public $consoleTextctrl = FALSE;
 	public $leftPanel;
 
+	public $readonlyBuffers = [];
+
 	public $activeDebugSession = FALSE;
 	public $xdebug = FALSE;
 
@@ -341,9 +343,7 @@ class Grease extends wxFrame
 
 			if(!$this->xdebug->init($messageDialog->GetStringSelection()))
 			{
-echo "failed to init session..";
-return;
-
+				return;
 			}
 
 			if(!$this->debugContext->IsShown())
@@ -408,6 +408,11 @@ return;
 
 		$this->xdebug->stop($this->activeDebugSession);
 		$this->activeDebugSession = FALSE;
+
+		foreach($this->readonlyBuffers as $bufferId)
+		{
+			$this->buffers[$bufferId]['textctrl']->SetReadOnly(FALSE);
+		}
 	}
 
 	public function scanDebugContext($parentNode, $tree)
@@ -443,29 +448,41 @@ return;
 		if(!isset($this->filesOpen[str_replace('file://', '', $filename)]))
 		{
 			$filename = str_replace('file://', '', $filename);
-			$id = $this->addTab(basename($filename), $filename, $focus=TRUE);
-			$buffer = $this->buffers[$id];
-			$this->filesOpen[$filename] = $id;
+			$bufferId = $this->addTab(basename($filename), $filename, $focus=TRUE);
+			$this->filesOpen[$filename] = $bufferId;
+			$this->readonlyBuffers[] = $bufferId;
+			$this->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
 		}
 		else
 		{
-			$buffer = $this->buffers[$this->filesOpen[str_replace('file://', '', $filename)]];
-			$this->notebook->SetSelection($buffer['position']);
+			$bufferId = $this->buffers[$this->filesOpen[str_replace('file://', '', $filename)]]['id'];
+			$this->notebook->SetSelection($this->buffers[$bufferId]['position']);
+			$this->readonlyBuffers[] = $bufferId;
+			$this->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
 		}
 
 		$lineno = $lineno-1;
-		//$start GetLineSelStartPosition($lineno);
-		//$end = $buffer['textctrl']->GetLineSelEndPosition($lineno);
 
-		$buffer['textctrl']->SetCurrentPos($buffer['textctrl']->GetLineSelStartPosition($lineno));
+		$this->buffers[$bufferId]['textctrl']->ScrollToLine($lineno);
+		$this->buffers[$bufferId]['textctrl']->GoToLine($lineno);
 
-		$buffer['textctrl']->ScrollToLine($lineno);
-		if($buffer['debugMarkerPosition'])
+		$startPos = $this->buffers[$bufferId]['textctrl']->PositionFromLine($lineno);
+		$endPos = $this->buffers[$bufferId]['textctrl']->GetLineEndPosition($lineno);
+echo 'start: '.$startPos.', end: '.$endPos."\n";
+$this->buffers[$bufferId]['textctrl']->SetSelBackground(TRUE, wxRED);
+		$this->buffers[$bufferId]['textctrl']->SetSelection($startPos, $endPos);
+
+$this->buffers[$bufferId]['textctrl']->SetSelBackground(TRUE, wxWHITE);
+
+		//$buffer['textctrl']->SetCurrentPos($buffer['textctrl']->GetLineSelStartPosition($lineno));
+
+		if($this->buffers[$bufferId]['debugMarkerPosition'])
 		{
-			$buffer['textctrl']->MarkerDelete($buffer['debugMarkerPosition'], 1);
+echo 'deleting marker: '.$this->buffers[$bufferId]['debugMarkerPosition']."\n";
+			$this->buffers[$bufferId]['textctrl']->MarkerDelete($this->buffers[$bufferId]['debugMarkerPosition'], 1);
 		}
-		$buffer['textctrl']->MarkerAdd($lineno, 1);
-		$buffer['debugMarkerPosition'] = $lineno;
+		$this->buffers[$bufferId]['textctrl']->MarkerAdd($lineno, 1);
+		$this->buffers[$bufferId]['debugMarkerPosition'] = $lineno;
 	}
 
 	public function onDebugStepInto()
@@ -767,6 +784,7 @@ $primarySplitterWindow->SetSashGravity(0.0);
 			$this->buffers[$id]['fileMd5'] = FALSE;
 		}
 
+		$this->buffers[$id]['id'] = $id;
 		$this->buffers[$id]['title'] = $title;
 		$this->buffers[$id]['file'] = $file;
 
