@@ -73,17 +73,19 @@ class Handler
 		$this->base->dispatch();
 	}
 
-	public function ev_error($listener, $ctx)
+	public function ev_error($listener, $ctx, $id)
 	{
 		$errno = \EventUtil::getLastSocketErrno();
 		fprintf(STDERR, "Got an error %d (%s) on the listener. Shutting down.\n", $errno, \EventUtil::getLastSocketError());
 		if($errno!=0)
 		{
-//print_r(debug_print_backtrace());
-			//$this->base->exit(NULL);
-			//exit();
+			if(isset($this->connections[$id]))
+			{
+				unset($this->servers[$this->connections[$id]['idekey']]);
+				unset($this->connections[$id]);
+			}
 		}
-		return;
+		return FALSE;
 	}
 
 	public function ev_accept($listener, $fd, $address, $ctx)

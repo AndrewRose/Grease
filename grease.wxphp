@@ -471,6 +471,12 @@ $primarySplitterWindow->SetSashGravity(0.0);
 		{
 			$data = json_decode($this->xdebug->getSessions(), TRUE);
 
+			if($data == 0)
+			{
+				wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
+				return FALSE;
+			}
+
 			if(!is_array($data) || empty($data))
 			{
 				wxMessageBox('No active debugging sessions available', 'Error');
@@ -503,6 +509,13 @@ $primarySplitterWindow->SetSashGravity(0.0);
 		else
 		{
 			$data = json_decode($this->xdebug->run($this->activeDebugSession), TRUE);
+
+			if($data == 0)
+			{
+				wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
+				return FALSE;
+			}
+
 			if($data['status'] == 'break')
 			{
 				$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
@@ -607,7 +620,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 		// where,	level, type, filename, lineno
 		foreach($stack as $idx => $frame)
 		{
-			$this->debugStack->InsertItem($idx, $frame['filename'].':'.$frame['lineno'].' -> '.$frame['where']);
+			$this->debugStack->InsertItem($idx, basename(str_replace('file://', '', $frame['filename'])).':'.$frame['lineno'].' -> '.$frame['where']);
 		}
 	}
 
@@ -669,6 +682,15 @@ echo 'deleting marker: '.$this->buffers[$bufferId]['debugMarkerPosition']."\n";
 
 
 		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
+echo 'data:';
+print_r($data);
+		if($data == 0)
+		{
+			wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
+			$this->onDebugStop();
+			return FALSE;
+		}
+
 		$this->debugContext->DeleteChildren($this->debugContextRoot);
 		$this->debugStack->DeleteAllItems();
 		$this->scanDebugStack(json_decode($this->xdebug->getStack($this->activeDebugSession), TRUE));
