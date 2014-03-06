@@ -502,12 +502,18 @@ $primarySplitterWindow->SetSashGravity(0.0);
 		}
 		else
 		{
-			$ret = json_decode($this->xdebug->run($this->activeDebugSession), TRUE);
-			if($ret['status'] == 'break')
+			$data = json_decode($this->xdebug->run($this->activeDebugSession), TRUE);
+			if($data['status'] == 'break')
 			{
-				$this->debugOpenFileAndOrMoveToLine($ret['filename'], $ret['lineno']);
+				$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
+				$this->debugContext->DeleteChildren($this->debugContextRoot);
+				$this->debugStack->DeleteAllItems();
+				$this->scanDebugStack(json_decode($this->xdebug->getStack($this->activeDebugSession), TRUE));
+				$this->scanDebugContext($this->debugContextRoot, json_decode($this->xdebug->getContext($this->activeDebugSession), TRUE));
+				$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
+
 			}
-			else if($ret['status'] == 'stopping')
+			else if($data['status'] == 'stopping')
 			{
 				$this->activeDebugSession = FALSE;
 			}
