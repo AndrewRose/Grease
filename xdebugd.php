@@ -83,6 +83,7 @@ class Handler
 			//$this->base->exit(NULL);
 			//exit();
 		}
+		return;
 	}
 
 	public function ev_accept($listener, $fd, $address, $ctx)
@@ -117,6 +118,7 @@ class Handler
 	{
 //echo 'S('.$id.'): '.$string."\n";
 		$this->connections[$id]['cnx']->write($string);
+		return;
 	}
 
         public function ev_read($buffer, $id)
@@ -200,6 +202,22 @@ class Handler
 		}
 	}
 
+	private function scanStack($node)
+	{
+		$ret = [];
+		foreach($node->childNodes as $node)
+		{
+			$ret[] = [
+				'where' => $node->getAttribute('where'),
+				'level' => $node->getAttribute('level'),
+				'type' => $node->getAttribute('type'),
+				'filename' => $node->getAttribute('filename'),
+				'lineno' => $node->getAttribute('lineno')
+			];
+		}
+		return $ret;
+	}
+
 	private function parseClientData($id, $data)
 	{
 		$this->xml->loadXML($data);
@@ -254,6 +272,13 @@ echo "server says: ".$data ."\n\n";
 				{
 					$this->scanContext($rootNode, $ret);
 					$ret = json_encode($ret);
+					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+				}
+				break;
+
+				case 'stack_get':
+				{
+					$ret = json_encode($this->scanStack($rootNode));
 					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 				}
 				break;
@@ -345,6 +370,12 @@ echo "client says: ".$data ."\n\n";
 				case 'contextGet':
 				{
 					$this->contextGet($id, $serverId, $idekey);
+				}
+				break;
+
+				case 'stackGet':
+				{
+					$this->stackGet($id, $serverId, $idekey);
 				}
 				break;
 

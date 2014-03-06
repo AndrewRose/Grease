@@ -34,12 +34,15 @@ class Grease extends wxFrame
 	public $searchReplaceSearchTextCtrl = FALSE;
 	public $consoleWindow = FALSE;
 	public $consoleTextctrl = FALSE;
+	public $leftPanel;
 
 	public $activeDebugSession = FALSE;
 	public $xdebug = FALSE;
 
-	public $debugTree;
-	public $debugTreeRoot;
+	public $debugContext;
+	public $debugContextRoot;
+
+	public $debugStack;
 
 	public $filesOpen = [];
 
@@ -331,11 +334,23 @@ class Grease extends wxFrame
 			$messageDialog = new wxSingleChoiceDialog($this, 'Select session', 'Select active debugging session', count($sessions), $sessions, NULL, wxCHOICEDLG_STYLE);
 			$resp = $messageDialog->ShowModal();
 
+			if($resp == wxID_CANCEL)
+			{
+				return;
+			}
+
 			if(!$this->xdebug->init($messageDialog->GetStringSelection()))
 			{
 echo "failed to init session..";
 return;
+
 			}
+
+			if(!$this->debugContext->IsShown())
+			{
+				$this->debugShowPanels();
+			}
+
 			$this->activeDebugSession = $messageDialog->GetStringSelection();
 		}
 		else
@@ -344,6 +359,10 @@ return;
 			if($ret['status'] == 'break')
 			{
 				$this->debugOpenFileAndOrMoveToLine($ret['filename'], $ret['lineno']);
+			}
+			else if($ret['status'] == 'stopping')
+			{
+				$this->activeDebugSession = FALSE;
 			}
 		}
 	}
@@ -370,6 +389,11 @@ return;
 	
 	public function onDebugStop()
 	{
+		if($this->debugContext->IsShown())
+		{
+			$this->debugHidePanels();
+		}
+
 		if(!$this->xdebug->connected)
 		{
 			wxMessageBox('Not connected to xdebugd!', 'Error');
@@ -386,12 +410,40 @@ return;
 		$this->activeDebugSession = FALSE;
 	}
 
+	public function scanDebugContext($parentNode, $tree)
+	{
+		if(is_array($tree))
+		{
+			foreach($tree as $node => $props)
+			{
+				if($props['type'] == 'array' || $props['type'] == 'object')
+				{
+					$nodeId = $this->debugContext->AppendItem($parentNode, $node.' = '.$props['type']);
+					$this->scanDebugContext($nodeId, $props['properties']);
+				}
+				else
+				{
+					$this->debugContext->AppendItem($parentNode, $node.' = '.$props['value']);
+				}
+			}
+		}
+	}
+
+	public function scanDebugStack($stack)
+	{
+		// where,	level, type, filename, lineno
+		foreach($stack as $idx => $frame)
+		{
+			$this->debugStack->InsertItem($idx, $frame['filename'].':'.$frame['lineno'].' -> '.$frame['where']);
+		}
+	}
+
 	public function debugOpenFileAndOrMoveToLine($filename, $lineno)
 	{
 		if(!isset($this->filesOpen[str_replace('file://', '', $filename)]))
 		{
 			$filename = str_replace('file://', '', $filename);
-			$id = $this->addTab($filename, $filename, $focus=TRUE);
+			$id = $this->addTab(basename($filename), $filename, $focus=TRUE);
 			$buffer = $this->buffers[$id];
 			$this->filesOpen[$filename] = $id;
 		}
@@ -432,8 +484,10 @@ return;
 
 
 		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
-		$this->debugTree->DeleteChildren($this->debugTreeRoot);
-		$this->scanDebugContext($this->debugTreeRoot, json_decode($this->xdebug->getContext($this->activeDebugSession), TRUE));
+		$this->debugContext->DeleteChildren($this->debugContextRoot);
+		$this->debugStack->DeleteAllItems();
+		$this->scanDebugStack(json_decode($this->xdebug->getStack($this->activeDebugSession), TRUE));
+		$this->scanDebugContext($this->debugContextRoot, json_decode($this->xdebug->getContext($this->activeDebugSession), TRUE));
 		$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
 	}
 
@@ -445,6 +499,20 @@ return;
 	public function onDebugStepOut()
 	{
 
+	}
+
+	public function debugShowPanels()
+	{
+		$this->debugContext->Show();
+		$this->debugStack->Show();
+		$this->leftPanel->Layout();
+	}
+
+	public function debugHidePanels()
+	{
+		$this->debugContext->Hide();
+		$this->debugStack->Hide();
+		$this->leftPanel->Layout();
 	}
 
 	public function __construct( $parent=null )
@@ -517,14 +585,14 @@ return;
 		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
 
 		/* left panel */
-$leftPanelMaxSize = 200; //($this->GetSize()->GetWidth()/100)*20;
-		$leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
+$leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
+		$this->leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
 		$leftSizer = new wxBoxSizer(wxVERTICAL);
 
-		$this->tree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+		$this->tree = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
 
-		$this->debugTree = new wxTreeCtrl($leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
-		$this->debugTreeRoot = $this->debugTree->AddRoot('wxphp');
+		$this->debugContext = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+		$this->debugContextRoot = $this->debugContext->AddRoot('wxphp');
 
 		$this->treeRoot = $this->tree->AddRoot('wxphp');
 
@@ -535,12 +603,17 @@ $leftPanelMaxSize = 200; //($this->GetSize()->GetWidth()/100)*20;
 
 		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
 
+		$this->debugStack = new wxListCtrl ($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_LIST);
+
 		$leftSizer->Add($this->tree, 1, wxALL|wxEXPAND, 5);
-		$leftSizer->Add($this->debugTree, 1, wxALL|wxEXPAND, 5);
+		$leftSizer->Add($this->debugContext, 1, wxALL|wxEXPAND, 5);
+		$leftSizer->Add($this->debugStack, 1, wxALL|wxEXPAND, 5);
 
+		$this->debugContext->Hide();
+		$this->debugStack->Hide();
 
-		$leftPanel->SetSizer($leftSizer);
-		$leftPanel->Layout();
+		$this->leftPanel->SetSizer($leftSizer);
+		$this->leftPanel->Layout();
 
 		/* right panel */
 $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->GetSize()->GetWidth()/100)*80;
@@ -561,7 +634,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 		$rightSizer->Fit($rightPanel);
 
 		/* main splitter window */
-		$primarySplitterWindow->SplitVertically($leftPanel, $rightPanel);
+		$primarySplitterWindow->SplitVertically($this->leftPanel, $rightPanel);
 
 		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
 
@@ -794,26 +867,6 @@ $primarySplitterWindow->SetSashGravity(0.0);
 echo $ev->GetURL()."\n";
 	}
 
-	public function scanDebugContext($parentNode, $tree)
-	{
-print_r($tree);
-		if(is_array($tree))
-		{
-			foreach($tree as $node => $props)
-			{
-				if($props['type'] == 'array' || $props['type'] == 'object')
-				{
-					$nodeId = $this->debugTree->AppendItem($parentNode, $node.' = '.$props['type']);
-					$this->scanDebugContext($nodeId, $props['properties']);
-				}
-				else
-				{
-					$this->debugTree->AppendItem($parentNode, $node.' = '.$props['value']);
-				}
-			}
-		}
-	}
-
 	public function scanDirectory($dir, $parentNode, $tree)
 	{
 		foreach(scandir($dir) as $node)
@@ -1017,26 +1070,6 @@ class myApp extends wxApp
 	}
 }
 
-class Debugger extends wxThread
-{
-	function __construct($parent)
-	{
-		parent::__construct(wxTHREAD_JOINABLE);
-		$this->parent = $parent;
-	}
-
-	function Entry()
-	{
-echo 'entry';
-
-
-while(1)
-{
-$this->YieldMethod();
-echo "awake\n";
-}
-	}
-}
 /*$pid = pcntl_fork();
 if($pid)
 {

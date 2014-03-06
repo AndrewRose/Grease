@@ -84,6 +84,14 @@ class libxdebugd
 		return $this->getResponse();
 	}
 
+	public function getStack($idekey='grease')
+	{
+		$packet = '<request command="stackGet" idekey="'.$idekey.'"></request>';
+		$packetLen = (string)strlen($packet)-1;
+		fwrite($this->sock, $packetLen."\0".$packet);
+		return $this->getResponse();
+	}
+
 	public function getContext($idekey='grease')
 	{
 		$packet = '<request command="contextGet" idekey="'.$idekey.'"></request>';
