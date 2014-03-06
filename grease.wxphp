@@ -100,20 +100,165 @@ class Grease extends wxFrame
 
 	public $searchWindow = FALSE;
 
+	public function __construct( $parent=null )
+	{
+		//echo json_encode($this->settings, JSON_PRETTY_PRINT);
+
+		//parent::__construct(null , wxID_ANY, , wxDefaultPosition, wxDefaultSize);
+		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+
+//		$this->debugger = new Debugger($this);
+		//$this->debugger>Create();
+//		$this->debugger->Run();
+
+		if(file_exists('.grease'))
+		{
+			$this->settings = json_decode(file_get_contents('.grease'), TRUE);
+		}
+
+		$this->Connect(wxEVT_CLOSE_WINDOW, [$this, 'onWindowClose']);
+		$this->theme = &$this->settings['themes'][$this->settings['theme']];
+
+		print_r($this->theme);
+
+		$this->SetSizeHints(wxDefaultSize, wxDefaultSize);
+//		$this->initMenu($this);
+
+		$sizer = new wxBoxSizer(wxHORIZONTAL);
+
+		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
+
+		$icons  = [
+			'newtab' => ['name' => 'New Tab', 'description' => 'New Tab', 'callback' => 'onAddTab'],
+			'fileopen' => ['name' => 'Open File', 'description' => 'Open File', 'callback' => 'onOpenFile'],
+			'filesave' => ['name' => 'Save Tab', 'description' => 'Save Tab', 'callback' => 'onSaveTab'],
+			'filesaveas' => ['name' => 'Save File As', 'description' => 'Save File As', 'callback' => 'onSaveTabAs'],
+			FALSE,
+			'find' => ['name' => 'Find', 'description' => 'Find', 'callback' => 'onFind'],
+			'findreplace' => ['name' => 'Find / Replace', 'description' => 'Find / Replace', 'callback' => 'onFindReplace'],
+			FALSE,
+			'debug_run' => ['name' => 'Debug - Start / Run', 'description' => 'Debug - Start / Run', 'callback' => 'onDebugStart'],
+			'debug_step_into' => ['name' => 'Debug - Step Into', 'description' => "Debug - Step Into\nSteps to the next statement, if there is a function call involved it will break on the first statement in that function", 'callback' => 'onDebugStepInto'],
+			/*'debug_step_out' => ['name' => 'Debug - Step Out', 'description' => "Debug - Step Out\nSteps out of the current scope and breaks on the statement after returning from the current function", 'callback' => 'onDebugStepOut'],
+			'debug_step_over' => ['name' => 'Debug - Step Over', 'description' => "Debug - Step Over\nSteps to the next statement, if there is a function call on the line from which the step_over is issued then the debugger engine will stop at the statement after the function call in the same scope as from where the command was issued", 'callback' => 'onDebugStepOver'],*/
+			'debug_stop' => ['name' => 'Debug - Stop', 'description' => 'Debug - Stop', 'callback' => 'onDebugStop'],
+			FALSE,
+			'console' => ['name' => 'Console', 'description' => 'Console', 'callback' => 'onConsoleShow'],
+			'about' => ['name' => 'About', 'description' => 'About', 'callback' => 'onAbout']
+		];
+
+		$i = 1;
+		foreach($icons as $iconName => $params)
+		{
+			if(!$params)
+			{
+				$toolbar->AddSeparator();
+			}
+			else
+			{
+				$icon = new wxBitmap();
+				$icon->LoadFile('ico'.DIRECTORY_SEPARATOR.$iconName.'.ico', wxBITMAP_TYPE_ICO);
+				$toolbar->AddTool($i, $params['name'], $icon, $params['description'], wxITEM_NORMAL);
+				$this->Connect($i, wxEVT_COMMAND_MENU_SELECTED, [$this, $params['callback']]);
+				$i++;
+			}
+		}
+
+		$toolbar->Realize();
+
+		/* priamry splitter */
+		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
+
+		/* left panel */
+$leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
+		$this->leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
+		$leftSizer = new wxBoxSizer(wxVERTICAL);
+
+		$this->tree = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+
+		$this->debugContext = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
+		$this->debugContextRoot = $this->debugContext->AddRoot('wxphp');
+
+		$this->treeRoot = $this->tree->AddRoot('wxphp');
+
+		foreach($this->settings['projects'] as $name => $details)
+		{
+			$this->treeAddRoot($details['name'], $details['path'], $name);
+		}
+
+		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
+
+		$this->debugStack = new wxListCtrl ($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_LIST);
+
+		$leftSizer->Add($this->tree, 1, wxALL|wxEXPAND, 5);
+		$leftSizer->Add($this->debugContext, 1, wxALL|wxEXPAND, 5);
+		$leftSizer->Add($this->debugStack, 1, wxALL|wxEXPAND, 5);
+
+		$this->debugContext->Hide();
+		$this->debugStack->Hide();
+
+		$this->leftPanel->SetSizer($leftSizer);
+		$this->leftPanel->Layout();
+
+		/* right panel */
+$rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->GetSize()->GetWidth()/100)*80;
+		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
+		$rightSizer = new wxBoxSizer(wxVERTICAL);
+
+		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
+		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
+		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']); // ...
+
+		//$this->notebook = new wxNotebook($rightPanel, wxID_ANY);
+		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
+
+
+		$rightSizer->Add($this->notebook, 1, wxALL|wxEXPAND, 5);
+		$rightPanel->SetSizer($rightSizer);
+		$rightPanel->Layout();
+		$rightSizer->Fit($rightPanel);
+
+		/* main splitter window */
+		$primarySplitterWindow->SplitVertically($this->leftPanel, $rightPanel);
+
+		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
+
+$primarySplitterWindow->SetSashGravity(0.0);
+
+		$sizer->Add($toolbar, 0, wxALL, 5 );
+
+		$this->SetSizer($sizer);
+		$this->Layout();
+
+		//$this->ShowFullScreen(true, wxFULLSCREEN_ALL);
+		$this->Centre( wxBOTH );
+
+		$this->createSearchDialog();
+		$this->createSearchReplaceDialog();
+		$this->createConsoleWindow();
+
+		$this->searchWindow->Hide();
+
+		$this->xdebug = new libxdebugd();
+		$this->xdebug->connect();
+	}
+
 	public function onMarginClick($ev)
 	{
-		$lineNumber = $this->buffers[$this->getTabSelected()]['textctrl']->LineFromPosition($ev->GetPosition());
+		$bufferId = $this->getTabSelected();
+		$lineNumber = (int)$this->buffers[$bufferId]['textctrl']->LineFromPosition($ev->GetPosition());
 
-		if(!isset($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]))
+		if(!isset($this->buffers[$bufferId]['breakpoints'][$lineNumber]))
 		{
-			$this->buffers[$this->getTabSelected()]['textctrl']->MarkerAdd($lineNumber, 0);
-			$this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber] = $this->onDebugBreakpointSetLine($this->buffers[$this->getTabSelected()]['file'], $lineNumber+1);
+			$this->buffers[$bufferId]['textctrl']->MarkerAdd($lineNumber, 0);
+			$this->buffers[$bufferId]['breakpoints'][$lineNumber] =  $this->onDebugBreakpointSetLine($this->buffers[$bufferId]['realpath'], $lineNumber+1);
+
 		}
 		else
 		{
-			$this->buffers[$this->getTabSelected()]['textctrl']->MarkerDelete($lineNumber, 0);
-			$this->onDebugBreakpointRemoveLine($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]);
-			unset($this->buffers[$this->getTabSelected()]['breakpoints'][$lineNumber]);
+			$this->buffers[$bufferId]['textctrl']->MarkerDelete($lineNumber, 0);
+			$this->onDebugBreakpointRemoveLine($this->buffers[$bufferId]['breakpoints'][$lineNumber]);
+			unset($this->buffers[$bufferId]['breakpoints'][$lineNumber]);
 		}
 	}
 
@@ -352,6 +497,8 @@ class Grease extends wxFrame
 			}
 
 			$this->activeDebugSession = $messageDialog->GetStringSelection();
+
+			$this->debugHonorBreakpoints(); // setup breakpoints that where defined before the session was started.
 		}
 		else
 		{
@@ -367,11 +514,26 @@ class Grease extends wxFrame
 		}
 	}
 
+	public function debugHonorBreakpoints()
+	{
+		foreach($this->buffers as $id => $buffer)
+		{
+			foreach($buffer['breakpoints'] as $lineno => $breakpoint)
+			{
+				if(!$breakpoint)
+				{
+echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
+					$this->onDebugBreakpointSetLine($buffer['realpath'], $lineno+1);
+				}
+			}
+		}
+	}
+
 	public function onDebugBreakpointSetLine($filename, $lineno)
 	{
 		if(!$this->xdebug->connected || !$this->activeDebugSession)
 		{
-			return;
+			return FALSE;
 		}
 
 		$this->xdebug->breakpointSetLine($this->activeDebugSession, $filename, $lineno);
@@ -381,7 +543,7 @@ class Grease extends wxFrame
 	{
 		if(!$this->xdebug->connected || !$this->activeDebugSession)
 		{
-			return;
+			return FALSE;
 		}
 
 		$this->xdebug->breakpointRemoveLine($this->activeDebugSession, $breakpointId);
@@ -397,13 +559,13 @@ class Grease extends wxFrame
 		if(!$this->xdebug->connected)
 		{
 			wxMessageBox('Not connected to xdebugd!', 'Error');
-			return;
+			return FALSE;
 		}
 
 		if(!$this->activeDebugSession)
 		{
 			wxMessageBox('No active debug session running!', 'Error');
-			return;
+			return FALSE;
 		}
 
 		$this->xdebug->stop($this->activeDebugSession);
@@ -532,149 +694,6 @@ echo 'deleting marker: '.$this->buffers[$bufferId]['debugMarkerPosition']."\n";
 		$this->leftPanel->Layout();
 	}
 
-	public function __construct( $parent=null )
-	{
-		//echo json_encode($this->settings, JSON_PRETTY_PRINT);
-
-		//parent::__construct(null , wxID_ANY, , wxDefaultPosition, wxDefaultSize);
-		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
-
-//		$this->debugger = new Debugger($this);
-		//$this->debugger>Create();
-//		$this->debugger->Run();
-
-		if(file_exists('.grease'))
-		{
-			$this->settings = json_decode(file_get_contents('.grease'), TRUE);
-		}
-
-		$this->Connect(wxEVT_CLOSE_WINDOW, [$this, 'onWindowClose']);
-		$this->theme = &$this->settings['themes'][$this->settings['theme']];
-
-		print_r($this->theme);
-
-		$this->SetSizeHints(wxDefaultSize, wxDefaultSize);
-//		$this->initMenu($this);
-
-		$sizer = new wxBoxSizer(wxHORIZONTAL);
-
-		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
-
-		$icons  = [
-			'newtab' => ['name' => 'New Tab', 'description' => 'New Tab', 'callback' => 'onAddTab'],
-			'fileopen' => ['name' => 'Open File', 'description' => 'Open File', 'callback' => 'onOpenFile'],
-			'filesave' => ['name' => 'Save Tab', 'description' => 'Save Tab', 'callback' => 'onSaveTab'],
-			'filesaveas' => ['name' => 'Save File As', 'description' => 'Save File As', 'callback' => 'onSaveTabAs'],
-			FALSE,
-			'find' => ['name' => 'Find', 'description' => 'Find', 'callback' => 'onFind'],
-			'findreplace' => ['name' => 'Find / Replace', 'description' => 'Find / Replace', 'callback' => 'onFindReplace'],
-			FALSE,
-			'debug_run' => ['name' => 'Debug - Start / Run', 'description' => 'Debug - Start / Run', 'callback' => 'onDebugStart'],
-			'debug_step_into' => ['name' => 'Debug - Step Into', 'description' => "Debug - Step Into\nSteps to the next statement, if there is a function call involved it will break on the first statement in that function", 'callback' => 'onDebugStepInto'],
-			/*'debug_step_out' => ['name' => 'Debug - Step Out', 'description' => "Debug - Step Out\nSteps out of the current scope and breaks on the statement after returning from the current function", 'callback' => 'onDebugStepOut'],
-			'debug_step_over' => ['name' => 'Debug - Step Over', 'description' => "Debug - Step Over\nSteps to the next statement, if there is a function call on the line from which the step_over is issued then the debugger engine will stop at the statement after the function call in the same scope as from where the command was issued", 'callback' => 'onDebugStepOver'],*/
-			'debug_stop' => ['name' => 'Debug - Stop', 'description' => 'Debug - Stop', 'callback' => 'onDebugStop'],
-			FALSE,
-			'console' => ['name' => 'Console', 'description' => 'Console', 'callback' => 'onConsoleShow'],
-			'about' => ['name' => 'About', 'description' => 'About', 'callback' => 'onAbout']
-		];
-
-		$i = 1;
-		foreach($icons as $iconName => $params)
-		{
-			if(!$params)
-			{
-				$toolbar->AddSeparator();
-			}
-			else
-			{
-				$icon = new wxBitmap();
-				$icon->LoadFile('ico'.DIRECTORY_SEPARATOR.$iconName.'.ico', wxBITMAP_TYPE_ICO);
-				$toolbar->AddTool($i, $params['name'], $icon, $params['description'], wxITEM_NORMAL);
-				$this->Connect($i, wxEVT_COMMAND_MENU_SELECTED, [$this, $params['callback']]);
-				$i++;
-			}
-		}
-
-		$toolbar->Realize();
-
-		/* priamry splitter */
-		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
-
-		/* left panel */
-$leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
-		$this->leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
-		$leftSizer = new wxBoxSizer(wxVERTICAL);
-
-		$this->tree = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
-
-		$this->debugContext = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
-		$this->debugContextRoot = $this->debugContext->AddRoot('wxphp');
-
-		$this->treeRoot = $this->tree->AddRoot('wxphp');
-
-		foreach($this->settings['projects'] as $name => $details)
-		{
-			$this->treeAddRoot($details['name'], $details['path'], $name);
-		}
-
-		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
-
-		$this->debugStack = new wxListCtrl ($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_LIST);
-
-		$leftSizer->Add($this->tree, 1, wxALL|wxEXPAND, 5);
-		$leftSizer->Add($this->debugContext, 1, wxALL|wxEXPAND, 5);
-		$leftSizer->Add($this->debugStack, 1, wxALL|wxEXPAND, 5);
-
-		$this->debugContext->Hide();
-		$this->debugStack->Hide();
-
-		$this->leftPanel->SetSizer($leftSizer);
-		$this->leftPanel->Layout();
-
-		/* right panel */
-$rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->GetSize()->GetWidth()/100)*80;
-		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
-		$rightSizer = new wxBoxSizer(wxVERTICAL);
-
-		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
-		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // AUINotebook event doesn't work ..
-		$this->notebook->Connect(wxID_ANY, wxEVT_AUINOTEBOOK_PAGE_CLOSE, [$this, 'onTabClose']); // ...
-
-		//$this->notebook = new wxNotebook($rightPanel, wxID_ANY);
-		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
-
-
-		$rightSizer->Add($this->notebook, 1, wxALL|wxEXPAND, 5);
-		$rightPanel->SetSizer($rightSizer);
-		$rightPanel->Layout();
-		$rightSizer->Fit($rightPanel);
-
-		/* main splitter window */
-		$primarySplitterWindow->SplitVertically($this->leftPanel, $rightPanel);
-
-		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
-
-$primarySplitterWindow->SetSashGravity(0.0);
-
-		$sizer->Add($toolbar, 0, wxALL, 5 );
-
-		$this->SetSizer($sizer);
-		$this->Layout();
-
-		//$this->ShowFullScreen(true, wxFULLSCREEN_ALL);
-		$this->Centre( wxBOTH );
-
-		$this->createSearchDialog();
-		$this->createSearchReplaceDialog();
-		$this->createConsoleWindow();
-
-		$this->searchWindow->Hide();
-
-		$this->xdebug = new libxdebugd();
-		$this->xdebug->connect();
-	}
-
 	public function createConsoleWindow()
 	{
 		$this->consoleWindow = new wxPanel($this, wxID_ANY, wxDefaultPosition, new wxSize(640, 480), wxTAB_TRAVERSAL, 'Console');
@@ -787,6 +806,7 @@ $primarySplitterWindow->SetSashGravity(0.0);
 		$this->buffers[$id]['id'] = $id;
 		$this->buffers[$id]['title'] = $title;
 		$this->buffers[$id]['file'] = $file;
+		$this->buffers[$id]['realpath'] = realpath($file);
 
 		$this->buffers[$id]['breakpoints'] = [];
 		$this->buffers[$id]['currentSearchPos'] = 0;
