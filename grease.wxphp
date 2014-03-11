@@ -100,33 +100,9 @@ class Grease extends wxFrame
 
 	public $searchWindow = FALSE;
 
-	public function __construct( $parent=null )
+	public function createToolbar()
 	{
-		//echo json_encode($this->settings, JSON_PRETTY_PRINT);
-
-		//parent::__construct(null , wxID_ANY, , wxDefaultPosition, wxDefaultSize);
-		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
-
-//		$this->debugger = new Debugger($this);
-		//$this->debugger>Create();
-//		$this->debugger->Run();
-
-		if(file_exists('.grease'))
-		{
-			$this->settings = json_decode(file_get_contents('.grease'), TRUE);
-		}
-
-		$this->Connect(wxEVT_CLOSE_WINDOW, [$this, 'onWindowClose']);
-		$this->theme = &$this->settings['themes'][$this->settings['theme']];
-
-		print_r($this->theme);
-
-		$this->SetSizeHints(wxDefaultSize, wxDefaultSize);
-//		$this->initMenu($this);
-
-		$sizer = new wxBoxSizer(wxHORIZONTAL);
-
-		$toolbar = new wxAuiToolBar( $this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
+		$toolbar = new wxAuiToolBar($this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_VERTICAL);
 
 		$icons  = [
 			'newtab' => ['name' => 'New Tab', 'description' => 'New Tab', 'callback' => 'onAddTab'],
@@ -165,13 +141,35 @@ class Grease extends wxFrame
 		}
 
 		$toolbar->Realize();
+		return $toolbar;
+	}
 
-		/* priamry splitter */
-		$primarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
+	public function __construct( $parent=null )
+	{
+		parent::__construct( $parent, wxID_ANY, "Grease", wxDefaultPosition, new wxSize( 1600,900 ), wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+
+		if(file_exists('.grease'))
+		{
+			$this->settings = json_decode(file_get_contents('.grease'), TRUE);
+		}
+
+		$this->Connect(wxEVT_CLOSE_WINDOW, [$this, 'onWindowClose']);
+		$this->theme = &$this->settings['themes'][$this->settings['theme']];
+
+		$this->SetSizeHints(wxDefaultSize, wxDefaultSize);
+//		$this->initMenu($this);
+
+		$sizer = new wxBoxSizer(wxHORIZONTAL);
+
+		$toolbar = $this->createToolbar();
+
+		/* splitters */
+		$this->secondarySplitterWindow = new wxSplitterWindow($this, wxID_ANY);
+		$this->primarySplitterWindow = new wxSplitterWindow($this->secondarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize(-1, 500));
 
 		/* left panel */
 $leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
-		$this->leftPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
+		$this->leftPanel = new wxPanel($this->primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($leftPanelMaxSize, -1));
 		$leftSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->tree = new wxTreeCtrl($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_HIDE_ROOT|wxTR_HAS_BUTTONS);
@@ -186,7 +184,7 @@ $leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
 			$this->treeAddRoot($details['name'], $details['path'], $name);
 		}
 
-		$this->tree->Connect( wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
+		$this->tree->Connect(wxEVT_TREE_SEL_CHANGED, [$this, "onTreeClick"]);
 
 		$this->debugStack = new wxListCtrl ($this->leftPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_LIST);
 
@@ -202,7 +200,7 @@ $leftPanelMaxSize = 300; //($this->GetSize()->GetWidth()/100)*20;
 
 		/* right panel */
 $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->GetSize()->GetWidth()/100)*80;
-		$rightPanel = new wxPanel($primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
+		$rightPanel = new wxPanel($this->primarySplitterWindow, wxID_ANY, wxDefaultPosition, new wxSize($rightPanelMaxSize, -1));
 		$rightSizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->notebook = new wxAuiNotebook($rightPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE | wxAUI_NB_CLOSE_ON_ALL_TABS | wxNO_BORDER);
@@ -212,19 +210,18 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 		//$this->notebook = new wxNotebook($rightPanel, wxID_ANY);
 		//$this->notebook->Connect(wxID_ANY, wxEVT_NOTEBOOK_PAGE_CHANGED, [$this, 'onTabChange']); // but can change to normal Notebook and it will..
 
-
 		$rightSizer->Add($this->notebook, 1, wxALL|wxEXPAND, 5);
 		$rightPanel->SetSizer($rightSizer);
 		$rightPanel->Layout();
 		$rightSizer->Fit($rightPanel);
 
 		/* main splitter window */
-		$primarySplitterWindow->SplitVertically($this->leftPanel, $rightPanel);
+		$this->primarySplitterWindow->SplitVertically($this->leftPanel, $rightPanel);
+		$this->createConsoleWindow($this->secondarySplitterWindow);
 
-		$sizer->Add($primarySplitterWindow, 1, wxALL|wxEXPAND, 5);
-
-$primarySplitterWindow->SetSashGravity(0.0);
-
+		$this->secondarySplitterWindow->Initialize($this->primarySplitterWindow);
+		$this->primarySplitterWindow->SetSashGravity(0.0);
+		$sizer->Add($this->secondarySplitterWindow, 1, wxALL|wxEXPAND, 5);
 		$sizer->Add($toolbar, 0, wxALL, 5 );
 
 		$this->SetSizer($sizer);
@@ -235,7 +232,7 @@ $primarySplitterWindow->SetSashGravity(0.0);
 
 		$this->createSearchDialog();
 		$this->createSearchReplaceDialog();
-		$this->createConsoleWindow();
+		//$this->createConsoleWindow();
 
 		$this->searchWindow->Hide();
 
@@ -469,13 +466,15 @@ $primarySplitterWindow->SetSashGravity(0.0);
 
 		if(!$this->activeDebugSession)
 		{
-			$data = json_decode($this->xdebug->getSessions(), TRUE);
-
-			if($data == 0)
+			$messageDialog = new wxMessageDialog($this, 'Run and debug this tab?', 'Query', wxYES_NO);
+			$resp = $messageDialog->ShowModal();
+			if($resp == wxID_YES)
 			{
-				wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
-				return FALSE;
+
+				return;
 			}
+
+			$data = json_decode($this->xdebug->getSessions(), TRUE);
 
 			if(!is_array($data) || empty($data))
 			{
@@ -722,44 +721,85 @@ print_r($data);
 		$this->leftPanel->Layout();
 	}
 
-	public function createConsoleWindow()
+	public function createConsoleWindow($parent)
 	{
-		$this->consoleWindow = new wxPanel($this, wxID_ANY, wxDefaultPosition, new wxSize(640, 480), wxTAB_TRAVERSAL, 'Console');
+		$this->consoleWindow = new wxPanel($parent, wxID_ANY, wxDefaultPosition, new wxSize(-1, 300), wxTAB_TRAVERSAL, 'Console');
 		$this->consoleWindow->Hide();
 
 		$sizer = new wxBoxSizer(wxVERTICAL);
 
 		$this->consoleTextctrl = new wxStyledTextCtrl($this->consoleWindow, wxID_ANY);
+		$this->consoleTextctrl->SetReadOnly(TRUE);
 		$this->consoleTextctrl->StyleSetForeground (wxSTC_STYLE_LINENUMBER, new wxColour (75, 75, 75) );
 		$this->consoleTextctrl->StyleSetBackground (wxSTC_STYLE_LINENUMBER, new wxColour (220, 220, 220));
 		$this->consoleTextctrl->SetMarginType (0, wxSTC_MARGIN_NUMBER);
 
+		$this->consoleTextentry = new wxTextCtrl($this->consoleWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, new wxSize(-1, 25), wxTE_PROCESS_ENTER);
+		$this->consoleTextentry->SetMaxSize(new wxSize(-1, 25));
+		$this->consoleTextentryCmdHistoryIdx = -1;
+		$this->consoleTextentryCmdHistory = [];
 
-		$textentry = new wxTextCtrl($this->consoleWindow, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-		$textentry->SetMaxSize(new wxSize(-1, 35));
-		$textentry->Connect(wxID_ANY, wxEVT_TEXT_ENTER, [$this, 'onConsoleCommandEnter']);
+		$this->consoleTextentry->Connect(wxID_ANY, wxEVT_KEY_DOWN, [$this, 'onConsoleCommandTextEntry']);
+
 
 		$sizer->Add($this->consoleTextctrl, 1, wxALL|wxEXPAND, 5);
-		$sizer->Add($textentry, 1, wxALL|wxEXPAND, 5);
+		$sizer->Add($this->consoleTextentry, 1, wxALL|wxEXPAND, 5);
 
 		$this->consoleWindow->SetSizer($sizer);
 	}
 
-	public function onConsoleCommandEnter($ev)
+	public function onConsoleCommandTextEntry($ev)
 	{
-		$cmd = $ev->GetString();
-		ob_start();
-		eval($cmd);
-		$ret = ob_get_contents();
-		ob_end_clean();
-		$this->consoleTextctrl->AppendText('>>> '.$cmd."\n".$ret."\n");
 
-//		$this->consoleTextctrl->ScrollToEnd();
-
-		$lineCount = substr_count($ret, "\n")+2;
-		while($lineCount--)
+		$keycode = $ev->GetKeyCode();
+		if($keycode == 315) // up
 		{
-			$this->consoleTextctrl->LineScrollDown();
+			if($this->consoleTextentryCmdHistoryIdx==-1)
+			{
+				$this->consoleTextentryCmdHistoryIdx = sizeof($this->consoleTextentryCmdHistory)-1;
+			}
+			else if($this->consoleTextentryCmdHistoryIdx>0)
+			{
+				$this->consoleTextentryCmdHistoryIdx--;
+			}
+
+			$this->consoleTextentry->Replace(0, strlen($this->consoleTextentryCmdHistory[$this->consoleTextentryCmdHistoryIdx]),  $this->consoleTextentryCmdHistory[$this->consoleTextentryCmdHistoryIdx]);
+		}
+		else if($keycode == 317) // down
+		{
+			if($this->consoleTextentryCmdHistoryIdx < sizeof($this->consoleTextentryCmdHistory)-1)
+			{
+				$this->consoleTextentryCmdHistoryIdx++;
+			}
+
+			$this->consoleTextentry->Replace(0, strlen($this->consoleTextentryCmdHistory[$this->consoleTextentryCmdHistoryIdx]),  $this->consoleTextentryCmdHistory[$this->consoleTextentryCmdHistoryIdx]);
+		}
+		else if($keycode == 13)
+		{
+			$cmd = $this->consoleTextentry->GetLineText(0);
+			$this->consoleTextentryCmdHistory[] = $cmd;
+			$this->consoleTextentryCmdHistoryIdx = -1;
+
+			ob_start();
+			eval($cmd);
+			$ret = ob_get_contents();
+			ob_end_clean();
+
+			$this->consoleTextctrl->SetReadOnly(FALSE);
+			$this->consoleTextctrl->AppendText('>>> '.$cmd."\n".$ret."\n");
+			$this->consoleTextctrl->SetReadOnly(TRUE);
+			$this->consoleTextentry->Clear();
+	//		$this->consoleTextctrl->ScrollToEnd();
+
+			$lineCount = substr_count($ret, "\n")+2;
+			while($lineCount--)
+			{
+				$this->consoleTextctrl->LineScrollDown();
+			}
+		}
+		else
+		{
+			$ev->Skip();
 		}
 	}
 
@@ -767,11 +807,13 @@ print_r($data);
 	{
 		if($this->consoleWindow->IsShownOnScreen())
 		{
-			$this->consoleWindow->Hide();
+			$this->consoleWindow->Show(FALSE);
+			$this->secondarySplitterWindow->Unsplit($this->consoleWindow);
 		}
 		else
 		{
-			$this->consoleWindow->Show();
+			$this->consoleWindow->Show(TRUE);
+			$this->secondarySplitterWindow->SplitHorizontally($this->primarySplitterWindow, $this->consoleWindow);
 		}
 	}
 
@@ -1116,7 +1158,7 @@ echo $saveAsDialog->GetPath().' '.$saveAsDialog->GetFilename()."\n";
 
 	public function onAbout()
 	{
-		wxMessageBox("Welcome to Grease\nCopyright(c) 2014 Andrew Rose (http://andrewrose.co.uk)\n\nFree for non-commerical use.", 'About');
+		wxMessageBox("Welcome to Grease!\n\nCopyright(c) 2014 Andrew Rose (http://andrewrose.co.uk)\n\nFree for non-commerical use.", 'About');
 	}
 }
 
