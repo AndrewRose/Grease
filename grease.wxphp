@@ -1104,7 +1104,7 @@ echo $ev->GetURL()."\n";
 		{
 			$filepath = $openDialog->GetPath();
 			$filename = $openDialog->GetFilename();
-			if(file_exists($filename))
+			if(file_exists($filepath))
 			{
 				$this->addTab($filename, $filepath, TRUE);
 			}
