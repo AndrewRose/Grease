@@ -900,7 +900,6 @@ file_put_contents($this->settingsFile, json_encode($this->settings, JSON_PRETTY_
 		$nodeData->project = $project;
 		$this->tree->SetItemData($node, $nodeData);
 		$this->scanDirectory($dir, $node, $this->tree);
-
 	}
 
 	public function addTab($title='New', $file=FALSE, $focus=FALSE, $webview=FALSE)
@@ -1043,7 +1042,7 @@ echo $ev->GetURL()."\n";
 				$nodeId = $tree->AppendItem($parentNode, $node);
 
 				$nodeData = new wxTreeItemData();
-				$nodeData->filename = $filename;
+				$nodeData->filename = realpath($filename);
 				$nodeData->name = $node;
 
 				$tree->SetItemData($nodeId, $nodeData);
@@ -1054,7 +1053,7 @@ echo $ev->GetURL()."\n";
 				$nodeId = $tree->AppendItem($parentNode, $node);
 
 				$nodeData = new wxTreeItemData();
-				$nodeData->filename = $filename;
+				$nodeData->filename = realpath($filename);
 				$nodeData->name = $node;
 
 				$tree->SetItemData($nodeId, $nodeData);

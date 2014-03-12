@@ -451,10 +451,10 @@ echo "client says: ".$data ."\n\n";
 	}
 }
 
-/*$pid = pcntl_fork();
+$pid = pcntl_fork();
 if($pid)
 {
-    exit();
-}*/
+	return 1;
+}
 $pid = 0;
 $t = new Handler($pid);
