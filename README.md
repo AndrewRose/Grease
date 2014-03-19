@@ -1,11 +1,13 @@
 Grease
 ======
 
-PHP editor written in PHP using wxPHP .. still early days.  Code needs cleaning up and refactoring as it's feature list has grown far greater than I anticipated.
+PHP editor written in PHP using wxPHP .. still early days and only tested under Archlinux.  Code needs cleaning up and refactoring as it's feature list has grown far greater than I anticipated.
 
 ![Screenshot](http://wxphp.org/images/static/application-grease-archlinux5.png)
 
-To get up and running under Archlinux, download https://aur.archlinux.org/packages/php-wxwidgets-git/ and build with makepkg.  Setup php.ini to load wxwidgets.so module and run `php grease.wxphp` from the commandline.
+To get up and running under Archlinux, install ![yaourt](https://wiki.archlinux.org/index.php/yaourt) and then install the ![wxPHP](http://wxphp.org) environment and Grease with ```yaourt -S wxphp wxphp-pecl-wxwidgets wxphp-wxwidgets wxphp-pecl-event wxphp-pecl-runkit wxphp-pecl-pthreads grease```
+
+Editor use:
 
 To use search hit CTRL+F or click icon.  Enter to cycle search. Escape to close dialog.
 
