@@ -253,66 +253,69 @@ echo "server says: ".$data ."\n\n";
 				$stopping = FALSE;
 			}
 
-			switch((string)$rootNode->getAttribute('command'))
-			{
-				case 'run':
-				{
-					$ret = ['status' => $rootNode->getAttribute('status') ];
-
-					if($ret['status'] == 'break')
-					{
-						$node = $rootNode->childNodes->item(0);
-						$ret['filename'] = $node->getAttribute('filename');
-						$ret['lineno'] = $node->getAttribute('lineno');
-					}
-					$ret = json_encode($ret);
-					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
-				}
-				break;
-
-				case 'context_get':
-				{
-					$this->scanContext($rootNode, $ret);
-					$ret = json_encode($ret);
-					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
-				}
-				break;
-
-				case 'stack_get':
-				{
-					$ret = json_encode($this->scanStack($rootNode));
-					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
-				}
-				break;
-
-				case 'step_into':
-				{
-					$node = $rootNode->childNodes->item(0);
-					$ret = json_encode(['filename' => $node->getAttribute('filename'), 'lineno' => $node->getAttribute('lineno')]);
-					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
-				}
-				break;
-
-				case 'breakpoint_set':
-				{
-					$ret = $rootNode->getAttribute('id');
-echo 'got breakpoint id: '.$ret."\n";
-					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
-				}
-				break;
-
-				case 'stop':
-				{
-					unset($this->servers[$idekey]);
-					unset($this->clients[$idekey]);
-				}
-				break;
-			}
-
 			if($stopping)
 			{
+				$this->ev_write($this->clients[$idekey], "\0");
 				unset($this->servers[$idekey]);
 				unset($this->clients[$idekey]);
+			}
+			else
+			{
+				switch((string)$rootNode->getAttribute('command'))
+				{
+					case 'run':
+					{
+						$ret = ['status' => $rootNode->getAttribute('status') ];
+
+						if($ret['status'] == 'break')
+						{
+							$node = $rootNode->childNodes->item(0);
+							$ret['filename'] = $node->getAttribute('filename');
+							$ret['lineno'] = $node->getAttribute('lineno');
+						}
+						$ret = json_encode($ret);
+						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+					}
+					break;
+
+					case 'context_get':
+					{
+						$this->scanContext($rootNode, $ret);
+						$ret = json_encode($ret);
+						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+					}
+					break;
+
+					case 'stack_get':
+					{
+						$ret = json_encode($this->scanStack($rootNode));
+						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+					}
+					break;
+
+					case 'step_into':
+					{
+						$node = $rootNode->childNodes->item(0);
+						$ret = json_encode(['filename' => $node->getAttribute('filename'), 'lineno' => $node->getAttribute('lineno')]);
+						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+					}
+					break;
+
+					case 'breakpoint_set':
+					{
+						$ret = $rootNode->getAttribute('id');
+echo 'got breakpoint id: '.$ret."\n";
+						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+					}
+					break;
+
+					case 'stop':
+					{
+						unset($this->servers[$idekey]);
+						unset($this->clients[$idekey]);
+					}
+					break;
+				}
 			}
 		}
 		else if($rootNode->nodeName == 'request') // client ide

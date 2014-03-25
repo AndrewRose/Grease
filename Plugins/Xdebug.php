@@ -26,7 +26,7 @@ class Grease_Xdebug implements Grease_Plugin
 			'debug_step_into' => ['name' => 'Debug - Step Into', 'description' => "Debug - Step Into\nSteps to the next statement, if there is a function call involved it will break on the first statement in that function", 'callback' => 'onDebugStepInto'],
 			/*'debug_step_out' => ['name' => 'Debug - Step Out', 'description' => "Debug - Step Out\nSteps out of the current scope and breaks on the statement after returning from the current function", 'callback' => 'onDebugStepOut'],
 			'debug_step_over' => ['name' => 'Debug - Step Over', 'description' => "Debug - Step Over\nSteps to the next statement, if there is a function call on the line from which the step_over is issued then the debugger engine will stop at the statement after the function call in the same scope as from where the command was issued", 'callback' => 'onDebugStepOver'],*/
-			'debug_stop' => ['name' => 'Debug - Stop', 'description' => 'Debug - Stop', 'callback' => onDebugStop]
+			'debug_stop' => ['name' => 'Debug - Stop', 'description' => 'Debug - Stop', 'callback' => 'onDebugStop']
 		];
 	}
 
@@ -252,7 +252,8 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 		else
 		{
 			$bufferId = $this->grease->buffers[$this->grease->filesOpen[str_replace('file://', '', $filename)]]['id'];
-			$this->grease->notebook->SetSelection($this->grease->buffers[$bufferId]['position']);
+echo 'debug: '.$bufferId."\n";
+			$this->grease->notebook->SetSelection($this->grease->buffers[$bufferId]['position']-1);
 			$this->grease->readonlyBuffers[] = $bufferId;
 			$this->grease->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
 		}

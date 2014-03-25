@@ -153,8 +153,7 @@ class Grease extends wxFrame
 			$classname = 'Grease_'.$plugin;
 			$this->plugins[$plugin] = new $classname;
 			$pluginParams = $this->plugins[$plugin]->init($this);
-echo $plugin.': ';
-print_r($params);
+
 // fix
 static $i=42;
 			$this->toolbar->AddSeparator();
