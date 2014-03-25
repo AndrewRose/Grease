@@ -5,11 +5,20 @@ class Grease_Console implements Grease_Plugin
 	private $grease;
 	private $parent;
 
-	public $consoleWindow = FALSE;
-	public $consoleTextctrl = FALSE;
+	private $sandbox;
+	private $consoleWindow = FALSE;
+	private $consoleTextctrl = FALSE;
 
 	public function init($grease)
 	{
+		$this->sandbox = new Runkit_Sandbox();
+		//$this->sandbox['parent_access'] = TRUE;
+		//$this->sandbox['parent_read'] = TRUE;
+		//$this->sandbox['parent_write'] = TRUE;
+		//$this->sandbox['parent_scope'] = 1;
+		//$this->sandbox->eval('$grease = new Runkit_Sandbox_Parent;');
+		//$this->sandbox->buffers = $grease->buffers;
+
 		$this->grease = $grease;
 		return ['parent' => 'bottom'];
 	}
@@ -49,7 +58,6 @@ class Grease_Console implements Grease_Plugin
 
 	public function onConsoleCommandTextEntry($ev)
 	{
-
 		$keycode = $ev->GetKeyCode();
 		if($keycode == 315) // up
 		{
@@ -79,14 +87,28 @@ class Grease_Console implements Grease_Plugin
 			$this->consoleTextentryCmdHistory[] = $cmd;
 			$this->consoleTextentryCmdHistoryIdx = -1;
 
-			ob_start();
-			eval($cmd);
-			$ret = ob_get_contents();
-			ob_end_clean();
+			// setup environment
+			//unset($keycode);
+			//$buffers  = $this->grease->buffers;
 
-			$this->consoleTextctrl->SetReadOnly(FALSE);
-			$this->consoleTextctrl->AppendText('>>> '.$cmd."\n".$ret."\n");
-			$this->consoleTextctrl->SetReadOnly(TRUE);
+			ob_start();
+			if($this->sandbox->eval($cmd) === FALSE)
+			{
+				ob_end_clean();
+				$this->consoleTextctrl->SetReadOnly(FALSE);
+				$this->consoleTextctrl->AppendText('!!! Error in code: '.$cmd."\n...Restarting sandbox afresh...\n");
+				$this->consoleTextctrl->SetReadOnly(TRUE);
+				$this->sandbox = new Runkit_Sandbox();
+			}
+			else
+			{
+				$ret = ob_get_contents();
+				ob_end_clean();
+				$this->consoleTextctrl->SetReadOnly(FALSE);
+				$this->consoleTextctrl->AppendText('>>> '.$cmd."\n".$ret."\n");
+				$this->consoleTextctrl->SetReadOnly(TRUE);
+			}
+
 			$this->consoleTextentry->Clear();
 	//		$this->consoleTextctrl->ScrollToEnd();
 
