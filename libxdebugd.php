@@ -57,7 +57,13 @@ class libxdebugd
 				return;
 			}
 		}
-		return fread($this->sock, $count);
+
+		if($count)
+		{
+			return fread($this->sock, $count);
+		}
+		
+		return FALSE;
 	}
 
 	public function getSessions()
@@ -128,5 +134,6 @@ class libxdebugd
 		$packet = '<request command="stop" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
 		fwrite($this->sock, $packetLen."\0".$packet);
+		return $this->getResponse();
 	}
 }

@@ -244,6 +244,21 @@ echo "server says: ".$data ."\n\n";
 
 			$idekey = $rootNode->getAttribute('transaction_id');
 
+			if(!isset($this->clients[$idekey]))
+			{
+				$ret = 0;
+				$this->ev_write($id, strlen($ret)."\0".$ret);
+				return;
+			}
+
+			if($rootNode->getAttribute('status') && $rootNode->getAttribute('status') == 'stopped')
+			{
+				$this->ev_write($this->clients[$idekey], "\0");
+				unset($this->servers[$idekey]);
+				unset($this->clients[$idekey]);
+				return;
+			}
+
 			if($rootNode->getAttribute('status') && $rootNode->getAttribute('status') == 'stopping')
 			{
 				$stopping = TRUE;
@@ -256,8 +271,6 @@ echo "server says: ".$data ."\n\n";
 			if($stopping)
 			{
 				$this->ev_write($this->clients[$idekey], "\0");
-				unset($this->servers[$idekey]);
-				unset($this->clients[$idekey]);
 			}
 			else
 			{
@@ -311,8 +324,7 @@ echo 'got breakpoint id: '.$ret."\n";
 
 					case 'stop':
 					{
-						unset($this->servers[$idekey]);
-						unset($this->clients[$idekey]);
+						$this->ev_write($this->clients[$idekey],  1);
 					}
 					break;
 				}

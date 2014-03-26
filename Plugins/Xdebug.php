@@ -128,6 +128,7 @@ class Grease_Xdebug implements Grease_Plugin
 			if($data == 0)
 			{
 				wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
+				$this->onDebugStop();
 				return FALSE;
 			}
 
@@ -143,6 +144,7 @@ class Grease_Xdebug implements Grease_Plugin
 			}
 			else if($data['status'] == 'stopping')
 			{
+				$this->xdebug->stop($this->activeDebugSession);
 				$this->activeDebugSession = FALSE;
 			}
 		}
@@ -297,6 +299,9 @@ echo 'deleting marker: '.$this->grease->buffers[$bufferId]['debugMarkerPosition'
 		}
 
 
+		$this->debugContext->DeleteChildren($this->debugContextRoot);
+		$this->debugStack->DeleteAllItems();
+
 		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
 echo 'data:';
 print_r($data);
@@ -307,8 +312,6 @@ print_r($data);
 			return FALSE;
 		}
 
-		$this->debugContext->DeleteChildren($this->debugContextRoot);
-		$this->debugStack->DeleteAllItems();
 		$this->scanDebugStack(json_decode($this->xdebug->getStack($this->activeDebugSession), TRUE));
 		$this->scanDebugContext($this->debugContextRoot, json_decode($this->xdebug->getContext($this->activeDebugSession), TRUE));
 		$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
