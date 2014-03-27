@@ -23,6 +23,7 @@
 */
 
 namespace xdebugd;
+ini_set('memory_limit', '256M');
 
 class Exception extends \Exception
 {
@@ -97,11 +98,6 @@ class Handler
 		$this->connections[$id]['dataLength'] = FALSE;
 		$this->connections[$id]['count'] = '';
 		$this->connections[$id]['idekey'] = FALSE;
-		$this->connections[$id]['message'] = [
-			'MAIL FROM' => FALSE,
-			'RCPT TO' => [],
-			'DATA' => FALSE
-		];
 
 		$this->connections[$id]['cnx'] = new \EventBufferEvent($this->base, $fd, \EventBufferEvent::OPT_CLOSE_ON_FREE);
 
@@ -228,13 +224,13 @@ class Handler
 		if($rootNode->nodeName == 'init') // server xdebug init
 		{
 			$idekey = $rootNode->getAttribute('idekey');
-echo "server (".$idekey.") says: ".$data ."\n\n";
+//echo "server (".$idekey.") says: ".$data ."\n\n";
 			$this->servers[$idekey] = $id;
 			$this->connections[$id]['idekey'] = $idekey;
 		}
 		else if($rootNode->nodeName == 'response') // server xdebug
 		{
-echo "server says: ".$data ."\n\n";
+//echo "server says: ".$data ."\n\n";
 			// check for error response from xdebug i.e:
 			// <error code="5"><message><![CDATA[command is not available]]></message></error>
 			if($rootNode->hasChildNodes() && $rootNode->childNodes->item(0)->nodeName == 'error')
@@ -357,7 +353,7 @@ echo "client says: ".$data ."\n\n";
 				case 'init':
 				{
 					$this->featureSet($id, $serverId, $idekey, 'max_data', 32768);
-					$this->featureSet($id, $serverId, $idekey, 'max_depth', 64);
+					$this->featureSet($id, $serverId, $idekey, 'max_depth', 8);
 					$this->featureSet($id, $serverId, $idekey, 'max_children', 32);
 					$this->clients[$idekey] = $id;
 
@@ -404,7 +400,7 @@ echo "client says: ".$data ."\n\n";
 
 				case 'breakpointRemoveLine':
 				{
-					$this->breakpointRemoveLine($id, $serverId, $rootNode->getAttribute('breakpointId'));
+					$this->breakpointRemoveLine($id, $serverId, $idekey, $rootNode->getAttribute('breakpointId'));
 				}
 				break;
 			}
@@ -462,7 +458,7 @@ echo "client says: ".$data ."\n\n";
 	public function breakpointRemoveLine($clientId, $serverId, $idekey, $breakpointId)
 	{
 		echo "breakpointRemoveLine: \n";
-		$this->ev_write($serverId, 'breakpoint_remove -i "'.$idekey.'" -d '.$breakpointId."\0");
+		$this->ev_write($serverId, 'breakpoint_remove -i "'.$idekey.'" -d "'.$breakpointId."\"\0");
 	}
 }
 

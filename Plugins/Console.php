@@ -12,15 +12,20 @@ class Grease_Console implements Grease_Plugin
 	public function init($grease)
 	{
 		$this->sandbox = new Runkit_Sandbox();
-		//$this->sandbox['parent_access'] = TRUE;
-		//$this->sandbox['parent_read'] = TRUE;
-		//$this->sandbox['parent_write'] = TRUE;
-		//$this->sandbox['parent_scope'] = 1;
-		//$this->sandbox->eval('$grease = new Runkit_Sandbox_Parent;');
-		//$this->sandbox->buffers = $grease->buffers;
+		$this->sandbox['parent_access'] = TRUE;
+		$this->sandbox['parent_read'] = TRUE;
+		$this->sandbox['parent_write'] = TRUE;
+		$this->sandbox['parent_scope'] = 1;
+		$this->sandbox->eval('$grease = new Runkit_Sandbox_Parent;');
+		$this->sandbox->buffers = $grease->buffers;
 
 		$this->grease = $grease;
 		return ['parent' => 'bottom'];
+	}
+
+	public function onMarginClick($ev)
+	{
+
 	}
 
 	public function initMenuItems()
@@ -88,8 +93,8 @@ class Grease_Console implements Grease_Plugin
 			$this->consoleTextentryCmdHistoryIdx = -1;
 
 			// setup environment
-			//unset($keycode);
-			//$buffers  = $this->grease->buffers;
+			unset($keycode);
+			$buffers  = $this->grease->buffers;
 
 			ob_start();
 			if($this->sandbox->eval($cmd) === FALSE)

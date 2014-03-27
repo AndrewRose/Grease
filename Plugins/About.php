@@ -11,6 +11,11 @@ class Grease_About implements Grease_Plugin
 		return ['parent' => FALSE];
 	}
 
+	public function onMarginClick($ev)
+	{
+
+	}
+
 	public function initMenuItems()
 	{
 		return ['about' => ['name' => 'About', 'description' => 'About', 'callback' => 'onAbout']];

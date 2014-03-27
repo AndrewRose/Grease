@@ -34,6 +34,8 @@ class libxdebugd
 	public function connect($idekey='xdebugd', $ip='127.0.0.1', $port=9000)
 	{
 		$this->sock = stream_socket_client('tcp://'.$ip.':'.$port, $errno, $errstr, 30);
+		stream_set_chunk_size($this->sock, 1024);
+
 		if (!$this->sock)
 		{
 // throw error!
@@ -60,7 +62,36 @@ class libxdebugd
 
 		if($count)
 		{
-			return fread($this->sock, $count);
+echo 'count: '.$count."\n";
+			if($count > 1024)
+			{
+				$chunk = 1024;
+				$data = fread($this->sock, $chunk);
+				$read = 1024;
+				while(strlen($data) < $count)
+				{
+
+					if(($read + $chunk) > $count)
+					{
+						$chunk = $count%$chunk;
+if($chunk == 0)
+{
+echo "zero chunk!\n";
+exit();
+}
+					}
+echo 'chunk: '.$chunk."\n";
+echo 'read: '.$read."\n";
+					$data .= fread($this->sock, $chunk);
+					$read += $chunk;
+				}
+			}
+			else
+			{
+				$data = fread($this->sock, $count);
+			}
+
+			return $data;
 		}
 		
 		return FALSE;

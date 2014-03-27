@@ -280,27 +280,16 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 
 		foreach($this->settings['state']['files'] as $file => $state)
 		{
-			$bufferId = $this->addTab(basename($file), $file);
+			$bufferId = $this->addTab(basename($file), $file, TRUE); // focus needs to be set to get position!
 			$this->filesOpen[$file] = $bufferId;
 		}
 	}
 
 	public function onMarginClick($ev)
 	{
-		$bufferId = $this->getTabSelected();
-		$lineNumber = (int)$this->buffers[$bufferId]['textctrl']->LineFromPosition($ev->GetPosition());
-
-		if(!isset($this->buffers[$bufferId]['breakpoints'][$lineNumber]))
+		foreach($this->plugins as $plugin)
 		{
-			$this->buffers[$bufferId]['textctrl']->MarkerAdd($lineNumber, 0);
-			$this->buffers[$bufferId]['breakpoints'][$lineNumber] =  $this->onDebugBreakpointSetLine($this->buffers[$bufferId]['realpath'], $lineNumber+1);
-
-		}
-		else
-		{
-			$this->buffers[$bufferId]['textctrl']->MarkerDelete($lineNumber, 0);
-			$this->onDebugBreakpointRemoveLine($this->buffers[$bufferId]['breakpoints'][$lineNumber]);
-			unset($this->buffers[$bufferId]['breakpoints'][$lineNumber]);
+			$plugin->onMarginClick($ev);
 		}
 	}
 
@@ -326,6 +315,7 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 
 		if($ev->GetKeyCode() == 27)
 		{
+			$this->buffers[$activeTabId]['textctrl']->ClearSelections();
 			if($replace)
 			{
 				$this->searchReplaceWindow->Hide();
@@ -364,26 +354,10 @@ $rightPanelMaxSize = $this->GetSize()->GetWidth()-$leftPanelMaxSize; //($this->G
 		{
 			$this->buffers[$activeTabId]['currentSearchPos'] = $newpos;
 		}
-		else
+		else // no more instances, return to beginning of document.
 		{
 //$this->searchTextCtrl->SetDefaultStyle(new wxTextAttr(wxRED));
-
-//			$messageDialog = new wxMessageDialog($this, 'Unable to find search string, start from begining of document?', 'Find', wxYES_NO);
-//			$resp = $messageDialog->ShowModal();
-//			if($resp == wxID_YES)
-//			{
-				$this->buffers[$activeTabId]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, 0);
-return;
-//				if($this->buffers[$activeTabId]['currentSearchPos'] === FALSE)
-//				{
-//					new wxMessageDialog($this, 'Unable to find search string in document', 'Find', wxOK);
-//					return;
-//				}
-//			}
-//			else
-//			{
-//				return;
-//			}
+			$this->buffers[$activeTabId]['currentSearchPos'] = strpos($this->buffers[$activeTabId]['textctrl']->GetText(), $searchString, 0);
 		}
 
 		$this->buffers[$activeTabId]['textctrl']->GotoPos($this->buffers[$activeTabId]['currentSearchPos']);

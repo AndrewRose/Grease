@@ -19,6 +19,27 @@ class Grease_Xdebug implements Grease_Plugin
 		return ['parent' => 'left'];
 	}
 
+	public function onMarginClick($ev)
+	{
+		$bufferId = $this->grease->getTabSelected();
+		$lineNumber = (int)$this->grease->buffers[$bufferId]['textctrl']->LineFromPosition($ev->GetPosition());
+
+		if(!isset($this->grease->buffers[$bufferId]['breakpoints'][$lineNumber]))
+		{
+			$this->grease->buffers[$bufferId]['textctrl']->MarkerAdd($lineNumber, 0);
+			$this->grease->buffers[$bufferId]['breakpoints'][$lineNumber] = $this->onDebugBreakpointSetLine($this->grease->buffers[$bufferId]['realpath'], $lineNumber+1);
+echo 'set breakpoint: '.$lineNumber."\n";
+
+		}
+		else
+		{
+echo 'unset breakpoint: '.$lineNumber."\n";
+			$this->grease->buffers[$bufferId]['textctrl']->MarkerDelete($lineNumber, 0);
+			$this->onDebugBreakpointRemoveLine($this->grease->buffers[$bufferId]['breakpoints'][$lineNumber]);
+			unset($this->grease->buffers[$bufferId]['breakpoints'][$lineNumber]);
+		}
+	}
+
 	public function initMenuItems()
 	{
 		return [
@@ -222,7 +243,10 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 				if($props['type'] == 'array' || $props['type'] == 'object')
 				{
 					$nodeId = $this->debugContext->AppendItem($parentNode, $node.' = '.$props['type']);
-					$this->scanDebugContext($nodeId, $props['properties']);
+					if(isset($props['properties']))
+					{
+						$this->scanDebugContext($nodeId, $props['properties']);
+					}
 				}
 				else
 				{
@@ -255,7 +279,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 		{
 			$bufferId = $this->grease->buffers[$this->grease->filesOpen[str_replace('file://', '', $filename)]]['id'];
 echo 'debug: '.$bufferId."\n";
-			$this->grease->notebook->SetSelection($this->grease->buffers[$bufferId]['position']-1);
+			$this->grease->notebook->SetSelection($this->grease->buffers[$bufferId]['position']);
 			$this->grease->readonlyBuffers[] = $bufferId;
 			$this->grease->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
 		}
@@ -303,8 +327,8 @@ echo 'deleting marker: '.$this->grease->buffers[$bufferId]['debugMarkerPosition'
 		$this->debugStack->DeleteAllItems();
 
 		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
-echo 'data:';
-print_r($data);
+//echo 'data:';
+//print_r($data);
 		if($data == 0)
 		{
 			wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');
