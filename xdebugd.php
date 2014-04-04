@@ -352,7 +352,7 @@ echo "client says: ".$data ."\n\n";
 			{
 				case 'init':
 				{
-					$this->featureSet($id, $serverId, $idekey, 'max_data', 32768);
+					$this->featureSet($id, $serverId, $idekey, 'max_data', 256);
 					$this->featureSet($id, $serverId, $idekey, 'max_depth', 8);
 					$this->featureSet($id, $serverId, $idekey, 'max_children', 32);
 					$this->clients[$idekey] = $id;

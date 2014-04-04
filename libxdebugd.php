@@ -62,7 +62,6 @@ class libxdebugd
 
 		if($count)
 		{
-echo 'count: '.$count."\n";
 			if($count > 1024)
 			{
 				$chunk = 1024;
@@ -74,14 +73,8 @@ echo 'count: '.$count."\n";
 					if(($read + $chunk) > $count)
 					{
 						$chunk = $count%$chunk;
-if($chunk == 0)
-{
-echo "zero chunk!\n";
-exit();
-}
 					}
-echo 'chunk: '.$chunk."\n";
-echo 'read: '.$read."\n";
+
 					$data .= fread($this->sock, $chunk);
 					$read += $chunk;
 				}
