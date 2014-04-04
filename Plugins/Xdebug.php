@@ -24,6 +24,10 @@ class Grease_Xdebug implements Grease_Plugin
 		$bufferId = $this->grease->getTabSelected();
 		$lineNumber = (int)$this->grease->buffers[$bufferId]['textctrl']->LineFromPosition($ev->GetPosition());
 
+echo 'linenumber: '.$lineNumber."\n";
+print_r($this->grease->buffers[$bufferId]['breakpoints']);
+echo '---';
+
 		if(!isset($this->grease->buffers[$bufferId]['breakpoints'][$lineNumber]))
 		{
 			$this->grease->buffers[$bufferId]['textctrl']->MarkerAdd($lineNumber, 0);
@@ -173,14 +177,14 @@ echo 'unset breakpoint: '.$lineNumber."\n";
 
 	public function debugHonorBreakpoints()
 	{
-		foreach($this->grease->buffers as $id => $buffer)
+		foreach($this->grease->buffers as $bufferId => $buffer)
 		{
-			foreach($buffer['breakpoints'] as $lineno => $breakpoint)
+			foreach($buffer['breakpoints'] as $lineNumber => $breakpoint)
 			{
 				if(!$breakpoint)
 				{
-echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
-					$this->onDebugBreakpointSetLine($buffer['realpath'], $lineno+1);
+echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
+					$this->grease->buffers[$bufferId]['breakpoints'][$lineNumber] = $this->onDebugBreakpointSetLine($buffer['realpath'], $lineNumber+1);
 				}
 			}
 		}
@@ -193,7 +197,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 			return FALSE;
 		}
 
-		$this->xdebug->breakpointSetLine($this->activeDebugSession, $filename, $lineno);
+		return $this->xdebug->breakpointSetLine($this->activeDebugSession, $filename, $lineno);
 	}
 
 	public function onDebugBreakpointRemoveLine($breakpointId)
@@ -231,6 +235,15 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineno."\n";
 		foreach($this->grease->readonlyBuffers as $bufferId)
 		{
 			$this->grease->buffers[$bufferId]['textctrl']->SetReadOnly(FALSE);
+
+// TODO - figure out how to handle breakpoints when lines change..
+/*			foreach($this->grease->buffers[$bufferId]['breakpoints'] as $lineNumber => $breakpointId)
+			{
+				$this->grease->buffers[$bufferId]['textctrl']->MarkerDelete($lineNumber, 0);
+			}
+
+			$this->grease->buffers[$bufferId]['breakpoints'] = [];
+*/
 		}
 	}
 
@@ -299,13 +312,13 @@ $this->grease->buffers[$bufferId]['textctrl']->SetSelBackground(TRUE, wxWHITE);
 
 		//$buffer['textctrl']->SetCurrentPos($buffer['textctrl']->GetLineSelStartPosition($lineno));
 
-		if($this->grease->buffers[$bufferId]['debugMarkerPosition'])
+		/*if($this->grease->buffers[$bufferId]['debugMarkerPosition'])
 		{
 echo 'deleting marker: '.$this->grease->buffers[$bufferId]['debugMarkerPosition']."\n";
-			$this->grease->buffers[$bufferId]['textctrl']->MarkerDelete($this->grease->buffers[$bufferId]['debugMarkerPosition'], 1);
+			$this->grease->buffers[$bufferId]['textctrl']->MarkerDelete($this->grease->buffers[$bufferId]['debugMarkerPosition']-1, 1);
 		}
 		$this->grease->buffers[$bufferId]['textctrl']->MarkerAdd($lineno, 1);
-		$this->grease->buffers[$bufferId]['debugMarkerPosition'] = $lineno;
+		$this->grease->buffers[$bufferId]['debugMarkerPosition'] = $lineno-1;*/
 	}
 
 	public function onDebugStepInto()
