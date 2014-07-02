@@ -1,0 +1,127 @@
+<html>
+<head>
+ <title> Grease - xdebugd web interface </title>
+</head>
+<body>
+<script>
+var xdebug ={
+	activeSession: false,
+	activeServerId: false,
+	sessions: false,
+
+	ajaxRequest: function(url, cb, params)
+	{
+		request = new XMLHttpRequest();
+
+		if(params)
+		{
+			request.open('GET', url+'?'+params, true);
+		}
+		else
+		{
+			request.open('GET', url, true);
+		}
+
+		var that = this;
+		request.onload = function()
+		{
+			if (request.status >= 200 && request.status < 400)
+			{
+				data = JSON.parse(request.responseText);
+				if(cb)
+				{
+					cb.call(that, data);
+				}
+			}
+			else
+			{
+				alert('Failed to phone home!');
+			}
+		};
+
+		request.onerror = function()
+		{
+
+		};
+
+		request.send();
+	},
+
+	getSessions: function()
+	{
+		this.ajaxRequest('/getSessions', this.listSessions);
+	},
+
+	init: function()
+	{
+		this.ajaxRequest('/init', this.dump, 'serverId='+this.activeServerId+'&idekey='+this.activeSession);
+	},
+
+	run: function()
+	{
+		this.ajaxRequest('/run', this.dump, 'serverId='+this.activeServerId+'&idekey='+this.activeSession);
+	},
+
+	stepInto: function()
+	{
+		this.ajaxRequest('/stepInto', this.dump, 'serverId='+this.activeServerId+'&idekey='+this.activeSession);
+	},
+
+	listSessions: function(sessions)
+	{
+		this.sessions = sessions;
+		var session;
+		var div = document.getElementById('sessions');
+		div.innerHTML  = '';
+
+		for(session in sessions)
+		{
+			console.log(session);
+			console.log(sessions[session]);
+			div.innerHTML = div.innerHTML + '<a href="#" onclick="xdebug.setSession(\''+session+'\');">'+session+'</a>&nbsp;|&nbsp;';
+		};
+	},
+
+	setSession: function(session)
+	{
+		this.activeSession = session;
+		this.activeServerId = this.sessions[session]['connectionId'];
+		this.dump({});
+	},
+
+	dump: function(data)
+	{
+// get specific session dump!!
+console.log('here');
+		this.ajaxRequest('/dump', this.showDump, false);
+	},
+
+	showDump: function(data)
+	{
+		var div = document.getElementById('dump');
+		div.innerHTML = '';
+
+		//for(var session in data)
+		//{
+			for(var ctx in data[this.activeSession])
+			{
+				if(data[this.activeSession][ctx] != null)
+				div.innerHTML = data[this.activeSession][ctx]['filename'] + ' -> ' + data[this.activeSession][ctx]['lineno'] + ' <b>' +data[this.activeSession][ctx]['preview']+ '</b><br>' + div.innerHTML;
+			}
+		//}
+	}
+};
+
+</script>
+<button style="display: inline;" onclick="xdebug.getSessions();"> Refresh Sessions </button> } <div style="display: inline;" id="sessions"></div>
+<hr>
+<button style="display: inline;" onclick="xdebug.init();"> Init </button>
+<button style="display: inline;" onclick="xdebug.run();"> Run </button>
+<button style="display: inline;" onclick="xdebug.stepInto();"> Step Into </button>
+<button style="display: inline;" onclick="xdebug.dump();"> Refresh Dump </button>
+<hr>
+<div id="content"></div>
+<hr>
+<div id="dump"></div>
+</body>
+</html>
