@@ -46,47 +46,52 @@ class libxdebugd
 		return TRUE;
 	}
 
-	public function getResponse()
+	public function getResponse($debug=FALSE)
 	{
-		$count = '';
-		$ch = fread($this->sock, 1);
-		while($ch!="\0")
+		while(1)
 		{
-			$count .= $ch;
+			$count = '';
 			$ch = fread($this->sock, 1);
-			if($ch === FALSE)
+			while($ch!="\0")
 			{
-				return;
-			}
-		}
-
-		if($count)
-		{
-			if($count > 1024)
-			{
-				$chunk = 1024;
-				$data = fread($this->sock, $chunk);
-				$read = 1024;
-				while(strlen($data) < $count)
+				$count .= $ch;
+				$ch = fread($this->sock, 1);
+				if($ch === FALSE)
 				{
-
-					if(($read + $chunk) > $count)
-					{
-						$chunk = $count%$chunk;
-					}
-
-					$data .= fread($this->sock, $chunk);
-					$read += $chunk;
+					return;
 				}
 			}
-			else
+echo "got count: ".$count."\n";
+			if($count)
 			{
-				$data = fread($this->sock, $count);
-			}
+				if($count > 1024)
+				{
+					$chunk = 1024;
+					$data = fread($this->sock, $chunk);
+					$totalRead = 1024;
+					while($totalRead < $count)
+					{
+						if(($totalRead + $chunk) > $count)
+						{
+							$chunk = $count - $totalRead; //$count%$chunk;
+						}
 
-			return $data;
+						$tmp = fread($this->sock, $chunk);
+						$totalRead += strlen($tmp); // get the actual read bytes
+						$data .= $tmp;
+					}
+				}
+				else
+				{
+					$data = fread($this->sock, $count);
+echo '>>>'.$data.'<<<'."\n";
+
+				}
+				return $data;
+			}
+			sleep(0.1);
 		}
-		
+
 		return FALSE;
 	}
 
@@ -150,7 +155,7 @@ class libxdebugd
 		$packet = '<request command="run" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
 		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		return $this->getResponse(TRUE);
 	}
 
 	public function stop($idekey='grease')

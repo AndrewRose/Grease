@@ -148,7 +148,9 @@ echo 'unset breakpoint: '.$lineNumber."\n";
 		}
 		else
 		{
-			$data = json_decode($this->xdebug->run($this->activeDebugSession), TRUE);
+$str = $this->xdebug->run($this->activeDebugSession);
+//echo '>>>> '.substr($str, 0, 40)." <<<<\n";
+			$data = json_decode($str, TRUE);
 
 			if($data == 0)
 			{
@@ -156,7 +158,7 @@ echo 'unset breakpoint: '.$lineNumber."\n";
 				$this->onDebugStop();
 				return FALSE;
 			}
-
+//print_r($data);
 			if($data['status'] == 'break')
 			{
 				$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
@@ -245,6 +247,9 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
 			$this->grease->buffers[$bufferId]['breakpoints'] = [];
 */
 		}
+
+		$this->debugContext->DeleteChildren($this->debugContextRoot);
+		$this->debugStack->DeleteAllItems();
 	}
 
 	public function scanDebugContext($parentNode, $tree)
@@ -271,6 +276,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
 
 	public function scanDebugStack($stack)
 	{
+print_r($stack);
 		// where,	level, type, filename, lineno
 		foreach($stack as $idx => $frame)
 		{
@@ -338,10 +344,10 @@ echo 'deleting marker: '.$this->grease->buffers[$bufferId]['debugMarkerPosition'
 
 		$this->debugContext->DeleteChildren($this->debugContextRoot);
 		$this->debugStack->DeleteAllItems();
+$str = $this->xdebug->stepInto($this->activeDebugSession);
+echo "StepInto str: ".$str."\n";
+		$data = json_decode($str, TRUE);
 
-		$data = json_decode($this->xdebug->stepInto($this->activeDebugSession), TRUE);
-//echo 'data:';
-//print_r($data);
 		if($data == 0)
 		{
 			wxMessageBox('Script being debugged has ended unexpectedly!', 'Error');

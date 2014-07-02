@@ -1,6 +1,5 @@
-#!/usr/bin/php
+#!/opt/wxphp/bin/php
 <?php
-
 /*
  This file is part of Grease
  http://github.com/AndrewRose/Grease
@@ -22,7 +21,10 @@
     along with Grease.  If not, see <http://www.gnu.org/licenses/>
 */
 
+//declare(ticks = 1);
+
 namespace xdebugd;
+include_once('Xdebugd/Xmlhttp.php');
 ini_set('memory_limit', '256M');
 
 class Exception extends \Exception
@@ -42,20 +44,22 @@ echo 'Got exception: '.$message.', code: '.$code."\n";
 class Handler
 {
 	private $xml;
+	private $xmlhttp;
 	public $connections = [];
-	public $buffers = [];
 	public $maxRead = 1024;
-	private $data = [];
 
-	private $clients = [];
-	private $servers = [];
+	public $clients = [];
+	public $servers = [];
 
 	private $base;
 	private $listener;
 
 	public function __construct($pid)
 	{
+		//pcntl_signal(SIGTERM, [$this, "sig"]);
+
 		$this->xml = new \DOMDocument();
+		$this->xmlhttp = new Xmlhttp($this);
 
 		$this->base = new \EventBase();
 		if(!$this->base) 
@@ -72,6 +76,14 @@ class Handler
 
 		$this->listener->setErrorCallback([$this, 'ev_error']);
 		$this->base->dispatch();
+		//$this->base->loop(\EventBase::NOLOCK);
+	}
+
+	public function sig($num)
+	{
+		echo 'Got signal '.$num.' to exit...';
+exit();
+		
 	}
 
 	public function ev_error($listener, $ctx, $id)
@@ -115,55 +127,75 @@ class Handler
 	protected function ev_write($id, $string)
 	{
 //echo 'S('.$id.'): '.$string."\n";
+if(!$id) print_r(debug_backtrace());
 		$this->connections[$id]['cnx']->write($string);
 		return;
 	}
 
         public function ev_read($buffer, $id)
         {
+//echo "\n\n".$id." is speaking.. ";
 		while($buffer->input->length > 0)
 		{
 			$this->connections[$id]['data'] .= $buffer->input->read($this->maxRead);
 		}
+//echo $this->connections[$id]['data'] . "\n";
 
-		while(strlen($this->connections[$id]['data']))
+		if(!$this->connections[$id]['dataLength']  && $this->connections[$id]['data'][0] == 'G')
 		{
-			if(!$this->connections[$id]['dataLength'])
-			{
-				$dataLength = strlen($this->connections[$id]['data']);
-				for($i=0; $i<$dataLength; $i++)
-				{
-					$ch = $this->connections[$id]['data']{$i};
+			$h = new \http\Message($this->connections[$id]['data']);
+			$url = new \http\Url($h->requestUrl);
+			$url = $url->toArray();
 
-					if($ch == "\0")
+			$params = [];
+			parse_str($url['query'], $params);
+
+			$this->handleWebRequest($id, $url['path'], $params, $h->getHeaders());
+
+			$this->connections[$id]['dataLength'] = FALSE;
+			$this->connections[$id]['data'] = '';
+		}
+		else
+		{
+			while(strlen($this->connections[$id]['data']))
+			{
+				if(!$this->connections[$id]['dataLength'])
+				{
+					$dataLength = strlen($this->connections[$id]['data']);
+					for($i=0; $i<$dataLength; $i++)
 					{
-						$this->connections[$id]['dataLength'] = $this->connections[$id]['count'];
-						$this->connections[$id]['data'] = substr($this->connections[$id]['data'], strlen($this->connections[$id]['count'])+1);
-						$this->connections[$id]['count'] = '';
-						break 1;
+						$ch = $this->connections[$id]['data']{$i};
+
+						if($ch == "\0")
+						{
+							$this->connections[$id]['dataLength'] = $this->connections[$id]['count'];
+							$this->connections[$id]['data'] = substr($this->connections[$id]['data'], strlen($this->connections[$id]['count'])+1);
+							$this->connections[$id]['count'] = '';
+							break 1;
+						}
+						$this->connections[$id]['count'] .= $ch;
 					}
-					$this->connections[$id]['count'] .= $ch;
 				}
-			}
 
-			if($this->connections[$id]['dataLength'] && (strlen($this->connections[$id]['data']) >= $this->connections[$id]['dataLength']))
-			{
-				try
+				if($this->connections[$id]['dataLength'] && (strlen($this->connections[$id]['data']) >= $this->connections[$id]['dataLength']))
 				{
-					$data = substr($this->connections[$id]['data'], 0, $this->connections[$id]['dataLength']+1);
-					$this->connections[$id]['data'] = substr($this->connections[$id]['data'], $this->connections[$id]['dataLength']+1, strlen($this->connections[$id]['data'])+1);  //+1 remove null byte
-					$this->parseClientData($id, $data);
-					$this->connections[$id]['dataLength'] = FALSE;
+					try
+					{
+						$data = substr($this->connections[$id]['data'], 0, $this->connections[$id]['dataLength']+1);
+						$this->connections[$id]['data'] = substr($this->connections[$id]['data'], $this->connections[$id]['dataLength']+1, strlen($this->connections[$id]['data'])+1);  //+1 remove null byte
+						$this->parseClientData($id, $data);
+						$this->connections[$id]['dataLength'] = FALSE;
 
+					}
+					catch (Exception $e) 
+					{
+
+					}
 				}
-				catch (Exception $e) 
+				else
 				{
-
+					break 1; // break out of loop so we can collect more datas
 				}
-			}
-			else
-			{
-				break 1; // break out of loop so we can collect more datas
 			}
 		}
 	}
@@ -218,6 +250,7 @@ class Handler
 
 	private function parseClientData($id, $data)
 	{
+//echo '--->'.$data."<---\n";
 		$this->xml->loadXML($data);
 		$rootNode = $this->xml->documentElement;
 
@@ -230,7 +263,7 @@ class Handler
 		}
 		else if($rootNode->nodeName == 'response') // server xdebug
 		{
-//echo "server says: ".$data ."\n\n";
+
 			// check for error response from xdebug i.e:
 			// <error code="5"><message><![CDATA[command is not available]]></message></error>
 			if($rootNode->hasChildNodes() && $rootNode->childNodes->item(0)->nodeName == 'error')
@@ -239,7 +272,7 @@ class Handler
 			}
 
 			$idekey = $rootNode->getAttribute('transaction_id');
-
+//echo "server (".$idekey.") says: ".$data ."\n\n";
 			if(!isset($this->clients[$idekey]))
 			{
 				$ret = 0;
@@ -249,7 +282,14 @@ class Handler
 
 			if($rootNode->getAttribute('status') && $rootNode->getAttribute('status') == 'stopped')
 			{
-				$this->ev_write($this->clients[$idekey], "\0");
+				if($this->clients[$idekey])
+				{
+					$this->ev_write($this->clients[$idekey], strlen(1)."\0".'1');
+				}
+				else
+				{
+					$this->xmlhttp->session[$idekey][] = 'STOPPED';
+				}
 				unset($this->servers[$idekey]);
 				unset($this->clients[$idekey]);
 				return;
@@ -266,10 +306,18 @@ class Handler
 
 			if($stopping)
 			{
-				$this->ev_write($this->clients[$idekey], "\0");
+				if($this->clients[$idekey])
+				{
+					$this->ev_write($this->clients[$idekey], strlen(1)."\0".'1');
+				}
+				else
+				{
+					$this->xmlhttp->session[$idekey][] = 'STOPPING';
+				}
 			}
 			else
 			{
+				$ret = '';
 				switch((string)$rootNode->getAttribute('command'))
 				{
 					case 'run':
@@ -282,8 +330,9 @@ class Handler
 							$ret['filename'] = $node->getAttribute('filename');
 							$ret['lineno'] = $node->getAttribute('lineno');
 						}
+
 						$ret = json_encode($ret);
-						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
 
@@ -291,44 +340,62 @@ class Handler
 					{
 						$this->scanContext($rootNode, $ret);
 						$ret = json_encode($ret);
-						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
 
 					case 'stack_get':
 					{
 						$ret = json_encode($this->scanStack($rootNode));
-						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
 
 					case 'step_into':
 					{
 						$node = $rootNode->childNodes->item(0);
-						$ret = json_encode(['filename' => $node->getAttribute('filename'), 'lineno' => $node->getAttribute('lineno')]);
-						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+						$filename = $node->getAttribute('filename');
+						$lineno = $node->getAttribute('lineno');
+
+$file = new \SplFileObject($filename);
+$file->seek($lineno-1);
+
+						$ret = json_encode(['filename' => $filename, 'lineno' => $lineno, 'preview' =>$file->current()]);
+//echo "Got stepInto xdebugd\n Will return: ".$ret."\n";
+						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
 
 					case 'breakpoint_set':
 					{
 						$ret = $rootNode->getAttribute('id');
-echo 'got breakpoint id: '.$ret."\n";
-						$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+///echo 'got breakpoint id: '.$ret."\n";
+						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
 
 					case 'stop':
 					{
-						$this->ev_write($this->clients[$idekey],  1);
+						//$this->ev_write($this->clients[$idekey],  1);
+						$ret = '1';
 					}
 					break;
+				}
+
+				if($this->clients[$idekey])
+				{
+//echo 'sending back to client: '.$ret."<<<\n";
+					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
+				}
+				else
+				{
+					$this->xmlhttp->sessions[$idekey][] = json_decode($ret, TRUE);
 				}
 			}
 		}
 		else if($rootNode->nodeName == 'request') // client ide
 		{
-echo "client says: ".$data ."\n\n";
+//echo "client says: ".$data ."\n\n";
 
 			if($rootNode->getAttribute('command') == 'getSessions')
 			{
@@ -352,13 +419,7 @@ echo "client says: ".$data ."\n\n";
 			{
 				case 'init':
 				{
-					$this->featureSet($id, $serverId, $idekey, 'max_data', 256);
-					$this->featureSet($id, $serverId, $idekey, 'max_depth', 8);
-					$this->featureSet($id, $serverId, $idekey, 'max_children', 32);
-					$this->clients[$idekey] = $id;
-
-					$ret = 1;
-					$this->ev_write($id, strlen($ret)."\0".$ret);
+					$this->init($id, $serverId, $idekey);
 				}
 				break;
 
@@ -404,6 +465,20 @@ echo "client says: ".$data ."\n\n";
 				}
 				break;
 			}
+		}
+	}
+
+	public function init($clientId, $serverId, $idekey)
+	{
+		$this->featureSet($clientId, $serverId, $idekey, 'max_data', 256);
+		$this->featureSet($clientId, $serverId, $idekey, 'max_depth', 8);
+		$this->featureSet($clientId, $serverId, $idekey, 'max_children', 32);
+		$this->clients[$idekey] = $clientId;
+
+		$ret = 1;
+		if($clientId)
+		{
+			$this->ev_write($clientId, strlen($ret)."\0".$ret);
 		}
 	}
 
@@ -459,6 +534,30 @@ echo "client says: ".$data ."\n\n";
 	{
 		echo "breakpointRemoveLine: \n";
 		$this->ev_write($serverId, 'breakpoint_remove -i "'.$idekey.'" -d "'.$breakpointId."\"\0");
+	}
+
+	public function handleWebRequest($clientId, $url, $params, $headers)
+	{
+		$wwwroot = 'Xdebugd/html/';
+		$data = '';
+
+		if($url == '/')
+		{
+		$ret = 'HTTP/1.0 200 OK
+Content-Type: text/html
+Content-Length: ';
+			$data .= file_get_contents($wwwroot.'index.html');
+		}
+		else
+		{
+		$ret = 'HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: ';
+			$data = $this->xmlhttp->handler($url, $params);
+		}
+
+		$ret .= strlen($data)."\r\n\r\n";
+		$this->ev_write($clientId, $ret.$data);
 	}
 }
 
