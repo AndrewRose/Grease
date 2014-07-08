@@ -109,6 +109,7 @@ class Grease extends wxFrame
 	];
 
 	public $searchWindow = FALSE;
+	public $plugins = [];
 
 	public function createToolbar()
 	{
