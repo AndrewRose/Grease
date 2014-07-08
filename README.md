@@ -5,7 +5,7 @@ PHP editor written in PHP using wxPHP .. still early days and only tested under 
 
 ![Screenshot](http://wxphp.org/images/static/application-grease-archlinux5.png)
 
-To get up and running under Archlinux, install [yaourt](http://wiki.archlinux.org/index.php/yaourt/) and then install the [wxPHP](http://wxphp.org/) environment and Grease with ```yaourt -S wxphp wxphp-pecl-wxwidgets wxphp-wxwidgets wxphp-pecl-event wxphp-pecl-runkit wxphp-pecl-pthreads grease```
+To get up and running under Archlinux, install [yaourt](http://wiki.archlinux.org/index.php/yaourt/) and then install the [wxPHP](http://wxphp.org/) environment and Grease with ```yaourt -S xphp xphp-pecl-wxwidgets xphp-pecl-event xphp-pecl-runkit grease```
 
 Editor use:
 
