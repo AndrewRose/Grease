@@ -61,7 +61,7 @@ class libxdebugd
 					return;
 				}
 			}
-echo "got count: ".$count."\n";
+
 			if($count)
 			{
 				if($count > 1024)
@@ -84,14 +84,12 @@ echo "got count: ".$count."\n";
 				else
 				{
 					$data = fread($this->sock, $count);
-echo '>>>'.$data.'<<<'."\n";
 
 				}
 				return $data;
 			}
 			sleep(0.1);
 		}
-
 		return FALSE;
 	}
 
@@ -99,70 +97,99 @@ echo '>>>'.$data.'<<<'."\n";
 	{
 		$packet = '<request command="getSessions"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function init($idekey='grease')
 	{
 		$packet = '<request command="init" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function stepInto($idekey='grease')
 	{
 		$packet = '<request command="stepInto" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function getStack($idekey='grease')
 	{
 		$packet = '<request command="stackGet" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function getContext($idekey='grease')
 	{
 		$packet = '<request command="contextGet" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function breakpointSetLine($idekey='grease', $filename, $lineno)
 	{
 		$packet = '<request command="breakpointSetLine" idekey="'.$idekey.'" filename="file://'.$filename.'" lineno="'.$lineno.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function breakpointRemoveLine($idekey='grease', $breakpointId)
 	{
 		$packet = '<request command="breakpointRemoveLine" idekey="'.$idekey.'" breakpointId="'.$breakpointId.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return TRUE;
+		}
+		return FALSE;
 	}
 
 	public function run($idekey='grease')
 	{
 		$packet = '<request command="run" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse(TRUE);
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+echo 'waiting for resp';
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 
 	public function stop($idekey='grease')
 	{
 		$packet = '<request command="stop" idekey="'.$idekey.'"></request>';
 		$packetLen = (string)strlen($packet)-1;
-		fwrite($this->sock, $packetLen."\0".$packet);
-		return $this->getResponse();
+		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
+		{
+			return $this->getResponse();
+		}
+		return FALSE;
 	}
 }

@@ -158,7 +158,7 @@ $str = $this->xdebug->run($this->activeDebugSession);
 				$this->onDebugStop();
 				return FALSE;
 			}
-//print_r($data);
+
 			if($data['status'] == 'break')
 			{
 				$this->debugOpenFileAndOrMoveToLine($data['filename'], $data['lineno']);
@@ -183,11 +183,11 @@ $str = $this->xdebug->run($this->activeDebugSession);
 		{
 			foreach($buffer['breakpoints'] as $lineNumber => $breakpoint)
 			{
-				if(!$breakpoint)
-				{
+				//if(!$breakpoint)
+				//{
 echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
 					$this->grease->buffers[$bufferId]['breakpoints'][$lineNumber] = $this->onDebugBreakpointSetLine($buffer['realpath'], $lineNumber+1);
-				}
+				//}
 			}
 		}
 	}
@@ -236,8 +236,10 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
 
 		foreach($this->grease->readonlyBuffers as $bufferId)
 		{
+if(isset($this->grease->buffers[$bufferId]))
+{
 			$this->grease->buffers[$bufferId]['textctrl']->SetReadOnly(FALSE);
-
+}
 // TODO - figure out how to handle breakpoints when lines change..
 /*			foreach($this->grease->buffers[$bufferId]['breakpoints'] as $lineNumber => $breakpointId)
 			{
@@ -276,7 +278,7 @@ echo 'Honoring breakpoint: '.$buffer['realpath'].':'.$lineNumber."\n";
 
 	public function scanDebugStack($stack)
 	{
-print_r($stack);
+//print_r($stack);
 		// where,	level, type, filename, lineno
 		foreach($stack as $idx => $frame)
 		{
@@ -297,7 +299,7 @@ print_r($stack);
 		else
 		{
 			$bufferId = $this->grease->buffers[$this->grease->filesOpen[str_replace('file://', '', $filename)]]['id'];
-echo 'debug: '.$bufferId."\n";
+//echo 'debug: '.$bufferId."\n";
 			$this->grease->notebook->SetSelection($this->grease->buffers[$bufferId]['position']);
 			$this->grease->readonlyBuffers[] = $bufferId;
 			$this->grease->buffers[$bufferId]['textctrl']->SetReadOnly(TRUE);
@@ -310,7 +312,7 @@ echo 'debug: '.$bufferId."\n";
 
 		$startPos = $this->grease->buffers[$bufferId]['textctrl']->PositionFromLine($lineno);
 		$endPos = $this->grease->buffers[$bufferId]['textctrl']->GetLineEndPosition($lineno);
-echo 'start: '.$startPos.', end: '.$endPos."\n";
+//echo 'start: '.$startPos.', end: '.$endPos."\n";
 $this->grease->buffers[$bufferId]['textctrl']->SetSelBackground(TRUE, wxRED);
 		$this->grease->buffers[$bufferId]['textctrl']->SetSelection($startPos, $endPos);
 
@@ -345,7 +347,7 @@ echo 'deleting marker: '.$this->grease->buffers[$bufferId]['debugMarkerPosition'
 		$this->debugContext->DeleteChildren($this->debugContextRoot);
 		$this->debugStack->DeleteAllItems();
 $str = $this->xdebug->stepInto($this->activeDebugSession);
-echo "StepInto str: ".$str."\n";
+//echo "StepInto str: ".$str."\n";
 		$data = json_decode($str, TRUE);
 
 		if($data == 0)

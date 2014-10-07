@@ -1,4 +1,4 @@
-#!/opt/wxphp/bin/php
+#!/opt/xphp/bin/php
 <?php
 /*
  This file is part of Grease
@@ -25,7 +25,7 @@
 
 namespace xdebugd;
 include_once('Xdebugd/Xmlhttp.php');
-ini_set('memory_limit', '256M');
+ini_set('memory_limit', '512M');
 
 class Exception extends \Exception
 {
@@ -50,6 +50,8 @@ class Handler
 
 	public $clients = [];
 	public $servers = [];
+
+	public $recording = [];
 
 	private $base;
 	private $listener;
@@ -77,6 +79,14 @@ class Handler
 		$this->listener->setErrorCallback([$this, 'ev_error']);
 		$this->base->dispatch();
 		//$this->base->loop(\EventBase::NOLOCK);
+	}
+
+	public function record($idekey)
+	{
+echo 'got reques to record: '.$idekey."\n";
+
+		$this->stepInto(FALSE, $this->servers[$idekey], $idekey) ;
+		$this->recording[$idekey] = TRUE;
 	}
 
 	public function sig($num)
@@ -127,9 +137,17 @@ exit();
 	protected function ev_write($id, $string)
 	{
 //echo 'S('.$id.'): '.$string."\n";
-if(!$id) print_r(debug_backtrace());
+if(!$id)
+{
+	print_r(debug_backtrace());
+}
+
+if(!isset($this->connections[$id]))
+{
+	return FALSE;
+}
 		$this->connections[$id]['cnx']->write($string);
-		return;
+		return TRUE;
 	}
 
         public function ev_read($buffer, $id)
@@ -250,7 +268,7 @@ if(!$id) print_r(debug_backtrace());
 
 	private function parseClientData($id, $data)
 	{
-//echo '--->'.$data."<---\n";
+echo '--->'.$data."<---\n";
 		$this->xml->loadXML($data);
 		$rootNode = $this->xml->documentElement;
 
@@ -263,7 +281,6 @@ if(!$id) print_r(debug_backtrace());
 		}
 		else if($rootNode->nodeName == 'response') // server xdebug
 		{
-
 			// check for error response from xdebug i.e:
 			// <error code="5"><message><![CDATA[command is not available]]></message></error>
 			if($rootNode->hasChildNodes() && $rootNode->childNodes->item(0)->nodeName == 'error')
@@ -308,7 +325,8 @@ if(!$id) print_r(debug_backtrace());
 			{
 				if($this->clients[$idekey])
 				{
-					$this->ev_write($this->clients[$idekey], strlen(1)."\0".'1');
+					$this->ev_write($this->clients[$idekey], strlen(1)."\0".'0');
+return;
 				}
 				else
 				{
@@ -322,6 +340,7 @@ if(!$id) print_r(debug_backtrace());
 				{
 					case 'run':
 					{
+echo 'got run!';
 						$ret = ['status' => $rootNode->getAttribute('status') ];
 
 						if($ret['status'] == 'break')
@@ -340,6 +359,7 @@ if(!$id) print_r(debug_backtrace());
 					{
 						$this->scanContext($rootNode, $ret);
 						$ret = json_encode($ret);
+						
 						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
 					break;
@@ -361,6 +381,15 @@ $file = new \SplFileObject($filename);
 $file->seek($lineno-1);
 
 						$ret = json_encode(['filename' => $filename, 'lineno' => $lineno, 'preview' =>$file->current()]);
+
+if(isset($this->recording[$idekey]) && $this->recording[$idekey])
+{
+	
+	$this->stackGet(FALSE, $this->servers[$idekey], $idekey) ;
+	$this->contextGet(FALSE, $this->servers[$idekey], $idekey) ;
+	$this->stepInto(FALSE, $this->servers[$idekey], $idekey) ;
+}
+
 //echo "Got stepInto xdebugd\n Will return: ".$ret."\n";
 						//$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 					}
@@ -384,13 +413,14 @@ $file->seek($lineno-1);
 
 				if($this->clients[$idekey])
 				{
-//echo 'sending back to client: '.$ret."<<<\n";
+echo 'sending back to client: '.$ret."<<<\n";
 					$this->ev_write($this->clients[$idekey], strlen($ret)."\0".$ret);
 				}
 				else
 				{
 					$this->xmlhttp->sessions[$idekey][] = json_decode($ret, TRUE);
 				}
+				unset($ret);
 			}
 		}
 		else if($rootNode->nodeName == 'request') // client ide
@@ -470,9 +500,9 @@ $file->seek($lineno-1);
 
 	public function init($clientId, $serverId, $idekey)
 	{
-		$this->featureSet($clientId, $serverId, $idekey, 'max_data', 256);
-		$this->featureSet($clientId, $serverId, $idekey, 'max_depth', 8);
-		$this->featureSet($clientId, $serverId, $idekey, 'max_children', 32);
+		$this->featureSet($clientId, $serverId, $idekey, 'max_data', 64);
+		$this->featureSet($clientId, $serverId, $idekey, 'max_depth', 4);
+		$this->featureSet($clientId, $serverId, $idekey, 'max_children', 16);
 		$this->clients[$idekey] = $clientId;
 
 		$ret = 1;
