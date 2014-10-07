@@ -33,7 +33,21 @@ class libxdebugd
 
 	public function connect($idekey='xdebugd', $ip='127.0.0.1', $port=9000)
 	{
-		$this->sock = stream_socket_client('tcp://'.$ip.':'.$port, $errno, $errstr, 30);
+		if(!$this->sock = stream_socket_client('tcp://'.$ip.':'.$port, $errno, $errstr, 30))
+		{
+			exec('nohup xphp xdebugd.php > /dev/null 2> /dev/null &');
+			$retries=10;
+			while($retries--)
+			{
+				if(($this->sock = stream_socket_client('tcp://'.$ip.':'.$port, $errno, $errstr, 30)))
+				{
+					break 1;
+				}
+				usleep(100000);
+			}
+			echo "Failed to start and connect to xdebugd.php!\n";
+		}
+
 		stream_set_chunk_size($this->sock, 1024);
 
 		if (!$this->sock)
