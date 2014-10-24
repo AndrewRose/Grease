@@ -35,7 +35,7 @@ class libxdebugd
 	{
 		if(!$this->sock = stream_socket_client('tcp://'.$ip.':'.$port, $errno, $errstr, 30))
 		{
-			exec('nohup xphp xdebugd.php > /dev/null 2> /dev/null &');
+			exec('nohup xphp /opt/grease/xdebugd.php > /dev/null 2> /dev/null &');
 			$retries=10;
 			while($retries--)
 			{
