@@ -552,6 +552,7 @@ echo 'sending back to client: '.$ret."<<<\n";
 	{
 		echo "stop\n";
 		$this->ev_write($serverId, 'stop -i "'.$idekey."\"\0");
+$this->connections[$id]['cnx']->free();
 	}
 
 	public function breakpointSetLine($clientId, $serverId, $idekey, $filename, $lineno)

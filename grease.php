@@ -22,8 +22,9 @@
     along with Grease.  If not, see <http://www.gnu.org/licenses/>
 */
 
-include_once('libxdebugd.php');
-include_once('plugin.php');
+define('ROOT_DIR', '/opt/grease');
+include_once(ROOT_DIR.'/libxdebugd.php');
+include_once(ROOT_DIR.'/plugin.php');
 
 class Grease extends wxFrame
 {
@@ -150,7 +151,7 @@ class Grease extends wxFrame
 	{
 		foreach($this->settings['plugins'] as $plugin)
 		{
-			include_once('Plugins/'.$plugin.'.php');
+			include_once(ROOT_DIR.'/Plugins/'.$plugin.'.php');
 			$classname = 'Grease_'.$plugin;
 			$this->plugins[$plugin] = new $classname;
 			$pluginParams = $this->plugins[$plugin]->init($this);
