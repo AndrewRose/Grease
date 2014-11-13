@@ -9,6 +9,19 @@ var xdebug ={
 	activeServerId: false,
 	sessions: false,
 
+	setupEvents: function()
+	{
+		window.onresize = this.event.windowResize;
+	},
+
+	event:
+	{
+			windowResize: function(ev)
+			{
+console.log(ev);
+			}
+	},
+
 	ajaxRequest: function(url, cb, params)
 	{
 		request = new XMLHttpRequest();
@@ -35,7 +48,7 @@ var xdebug ={
 			}
 			else
 			{
-				alert('Failed to phone home!');
+				//alert('Failed to phone home!');
 			}
 		};
 
@@ -65,6 +78,23 @@ var xdebug ={
 	stepInto: function()
 	{
 		this.ajaxRequest('/stepInto', this.dump, 'serverId='+this.activeServerId+'&idekey='+this.activeSession);
+	},
+
+	record: function()
+	{
+		this.ajaxRequest('/record', this.dump, 'serverId='+this.activeServerId+'&idekey='+this.activeSession);
+	},
+
+	stepAll: function()
+	{
+		var that = this;
+		setTimeout(
+			function()
+			{
+				that.stepInto();
+				that.stepAll();
+			},100
+		);
 	},
 
 	listSessions: function(sessions)
@@ -103,8 +133,12 @@ console.log('here');
 
 		//for(var session in data)
 		//{
+data[this.activeSession].reverse();
+var i = 0;
 			for(var ctx in data[this.activeSession])
 			{
+i++;
+if(i>=40) break;
 				if(data[this.activeSession][ctx] != null)
 				div.innerHTML = data[this.activeSession][ctx]['filename'] + ' -> ' + data[this.activeSession][ctx]['lineno'] + ' <b>' +data[this.activeSession][ctx]['preview']+ '</b><br>' + div.innerHTML;
 			}
@@ -112,12 +146,16 @@ console.log('here');
 	}
 };
 
+xdebug.setupEvents();
+
 </script>
 <button style="display: inline;" onclick="xdebug.getSessions();"> Refresh Sessions </button> } <div style="display: inline;" id="sessions"></div>
 <hr>
 <button style="display: inline;" onclick="xdebug.init();"> Init </button>
 <button style="display: inline;" onclick="xdebug.run();"> Run </button>
 <button style="display: inline;" onclick="xdebug.stepInto();"> Step Into </button>
+<button style="display: inline;" onclick="xdebug.stepAll();"> Step All </button>
+<button style="display: inline;" onclick="xdebug.record();"> Record </button>
 <button style="display: inline;" onclick="xdebug.dump();"> Refresh Dump </button>
 <hr>
 <div id="content"></div>

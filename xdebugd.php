@@ -24,7 +24,7 @@
 //declare(ticks = 1);
 
 namespace xdebugd;
-include_once('Xdebugd/Xmlhttp.php');
+include_once('/opt/grease/Xdebugd/Xmlhttp.php');
 ini_set('memory_limit', '512M');
 
 class Exception extends \Exception

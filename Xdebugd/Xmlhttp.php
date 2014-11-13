@@ -6,7 +6,7 @@ namespace xdebugd;
 
 class Xmlhttp
 {
-	private $methods = ['getSessions', 'run', 'init', 'stepInto', 'dump','shutdown'];
+	private $methods = ['getSessions', 'run', 'init', 'stepInto', 'dump','shutdown','record'];
 	private $xdebugd;
 
 	public $sessions = [];
@@ -80,5 +80,10 @@ class Xmlhttp
 	{
 		$this->xdebugd->stepInto(FALSE, $params['serverId'], $params['idekey']);
 		return '{}';
+	}
+
+	public function record($params)
+	{
+		$this->xdebugd->record($params['idekey']);
 	}
 }
