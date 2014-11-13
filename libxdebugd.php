@@ -204,7 +204,7 @@ echo 'waiting for resp';
 		$packetLen = (string)strlen($packet)-1;
 		if(FALSE !== fwrite($this->sock, $packetLen."\0".$packet))
 		{
-			return $this->getResponse();
+			//return $this->getResponse();
 		}
 		return FALSE;
 	}
