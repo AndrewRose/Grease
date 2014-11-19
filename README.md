@@ -1,4 +1,4 @@
-Grease
+Grease (BETA)
 ======
 
 PHP editor written in PHP with remote debugger and plugin API.
